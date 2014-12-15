@@ -55,6 +55,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 					if( !self.isExists( l.self.C('id') ) ) {
 						l.self._destroy();
 						l = null;
+						fields[id] = null;
 						return;
 					}
 					
@@ -92,9 +93,16 @@ email:zere.nobo@gmail.com or QQ邮箱
 					}			 
 				} );
 				if( !_s ) {
+					_v[name] = _v[name] || [];
 					val = _v[name].join(',');		
 				} else {
 					val = _v;	
+					if( $._isPlainObject( val ) ) {
+						$.each( val,function(x,d){
+							d = d || [];
+							d[x] = d.join(',');	
+						} );
+					}
 				}
 				return val;	
 			} else {
@@ -131,6 +139,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 					if( !self.isExists( l.self.C('id') ) ) {
 						l.self._destroy();
 						l = null;
+						fields[id] = null;
 						return;
 					}
 					
@@ -162,6 +171,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 					if( !self.isExists( l.self.C('id') ) ) {
 						l.self._destroy();
 						l = null;
+						fields[id] = null;
 						return;
 					}
 					
@@ -199,6 +209,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 					if( !self.isExists( l.self.C('id') ) ) {
 						l.self._destroy();
 						l = null;
+						fields[id] = null;
 						return;
 					}
 					
@@ -241,8 +252,10 @@ email:zere.nobo@gmail.com or QQ邮箱
 			var _opt = {
 				prefix : 'nexform-',
 				multiSplit : ',',
+				labelStyle : {},//尚未实现 预留
 				labelAlign : 'left',//left top bottom right
 				labelText : '',
+				labelTextAlign : 'left',//尚未实现 预留
 				renderTo : document.body,
 				labelWidth : 80,
 				labelCls : '',
@@ -1060,7 +1073,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 					
 					$('#'+opt.id+"").removeClass('nex-form-wraper-focus');
 					
-					if( (input.val() === '') && opt.isIE && ( opt.placeholder !== '' )  ) {
+					if( (input.val() === '') && Nex.IEVer && Nex.IEVer<10 && ( opt.placeholder !== '' )  ) {
 						input.addClass("nex-form-empty-field");
 						input.val(opt.placeholder);
 					}
@@ -1239,7 +1252,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 			var opt = self.C();
 			var input = $("#"+opt.id+"-input");
 			
-			if( opt.isIE && ( opt.placeholder !== '' ) ) {
+			if( Nex.IEVer && Nex.IEVer<10 && ( opt.placeholder !== '' ) ) {
 				if( arguments[0]+'' === '' ) {
 					input.addClass("nex-form-empty-field");	
 					arguments[0] = opt.placeholder;
@@ -2856,7 +2869,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 			self.bind('onClick.search',function(input,e){
 				var list = $('#'+opt.id+'_list');
 				if( !list.size() ) {
-					self.searchShowResult(  );
+					self.searchShowResult( opt.items );
 				}
 			});
 			self.bind('onSearchChange.search',function(input,e){

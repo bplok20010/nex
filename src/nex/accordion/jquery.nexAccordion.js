@@ -10,9 +10,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 
 ;(function($){
 	"use strict";
-	var accordion = Nex.extend('accordion','html');
-	var baseConf = Nex.html.getDefaults( Nex.html.getOptions() );
-	$.nexAccordion = $.extAccordion = accordion;
+	var accordion = Nex.define('Nex.Accordion','Nex.Html').setXType('accordion');
 	accordion.extend({
 		version : '1.0',
 		_Tpl : {
@@ -28,14 +26,15 @@ email:zere.nobo@gmail.com or QQ邮箱
 							+'</div>'		
 		}
 	});
-	accordion.setOptions(function(){
+	accordion.setOptions(function(opt,t){
 		return {
 			prefix : 'nexaccordion-',
-			autoRecovery : false,
 			autoResize : true,
-			containerCls : [baseConf.containerCls,'nex-accordion'].join(' '),
-			autoScrollCls : [baseConf.autoScrollCls,'nex-accordion-auto-scroll'].join(' '),
+			containerCls : [opt.containerCls,'nex-accordion'].join(' '),
+			autoScrollCls : [opt.autoScrollCls,'nex-accordion-auto-scroll'].join(' '),
 			autoScroll : false,
+			_hasBodyView : false,
+			_checkScrollBar : false,
 			itemHeaderSelectionable : false,
 			showCollapseIcon : true,
 			border : true,
@@ -94,7 +93,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 		setContainer : function(){
 			var self = this;
 			var opt = self.C();
-			Nex.html.fn.setContainer.apply( self,arguments );
+			Nex.Html.fn.setContainer.apply( self,arguments );
 			var container = opt.views['container'];
 			if( opt.border && opt.borderCls !== '' ) {
 				container.addClass( opt.borderCls );	
@@ -105,7 +104,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 			var self = this;
 			var opt = self.configs;
 			
-			Nex.html.fn._sysEvents.apply(self,arguments);
+			Nex.Html.fn._sysEvents.apply(self,arguments);
 			
 			if( opt.expandOnEvent == 1 ) {
 				self.bind('onItemClick',self._toggleItem);
@@ -237,12 +236,20 @@ email:zere.nobo@gmail.com or QQ邮箱
 				}
 			});		
 		},
+		/*
 		onViewSizeChange : function(func){
 			var self = this,
 				undef,
 				opt = self.configs;
 			self.setAccordionItemsSize();	
 			Nex.html.fn.onViewSizeChange.apply(self,arguments);
+		},
+		*/
+		_setViewSize : function(){
+			var self = this,
+				opt = self.configs;
+			self.setAccordionItemsSize();		
+			self.fireEvent("onSetViewSize",[opt]);	
 		},
 		setAccordionItemsSize : function(){
 			var self = this,
@@ -424,7 +431,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 			var container = opt.views['container'];
 			var items = opt.items;
 			var _item = opt._item;
-			var list
+			var list;
 			if( index !== undef ) {
 				list = $('#'+opt.id+'_accordion_item_'+index);	
 			} else {
@@ -451,7 +458,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 				undef,
 				opt = self.configs;
 				
-			Nex.html.fn.initComponent.apply(self,arguments);
+			Nex.Html.fn.initComponent.apply(self,arguments);
 				
 		}
 	});

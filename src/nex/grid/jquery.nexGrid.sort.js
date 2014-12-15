@@ -12,7 +12,8 @@ email:zere.nobo@gmail.com or QQ邮箱
 	"use strict";
 	//参数
 	$.nexGrid.addExtConf({
-						 	sortName : '',
+							pageSort : false,//只对当前页做排序
+							sortName : '',
 							sortOrder : 'asc'
 						 });
 	//事件
@@ -27,13 +28,14 @@ email:zere.nobo@gmail.com or QQ邮箱
 			opt = self.configs;
 		//防止重复绑定	
 		self.unbind("onColumnClick.sort");
+		self.unbind("onBeforeGetGridData.sort");
 		self.unbind("onGetGridData.sort");
 		self.unbind("onHeaderCreate.sort");
 		
 		//事件绑定
 		self.bind("onColumnClick.sort",self._sortColumn);
 		self.bind("onHeaderCreate.sort",self._setSortIcon);
-		self.bind("onGetGridData.sort",self._sortData);
+		self.bind("onBeforeGetGridData.sort",self._sortData);
 	});
 	$.nexGrid.fn.extend({
 		_sortColumn : function(field,td,e){
@@ -49,7 +51,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 			} else {
 				var _s = $(".datagrid-sort-icon",td);
 				if( !_s.size() ) {
-					$("div.datagrid-cell",td).append($('<span class="datagrid-sort-icon">&nbsp;</span>'));
+					$(".datagrid-cell",td).append($('<span class="datagrid-sort-icon">&nbsp;</span>'));
 				}
 			}
 			
@@ -165,7 +167,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 				if( a[index] >  b[index] ) {
 					return isAsc ? 1 : -1;
 				} if( a[index] === b[index] ){
-					return -1;
+					return 0;
 				} else {
 					return isAsc ? -1 : 1;
 				}

@@ -10,24 +10,24 @@ email:zere.nobo@gmail.com or QQ邮箱
 
 ;(function($){
 	"use strict";
-	var win = Nex.extend('window','html');
-	var baseConf = Nex.html.getDefaults( Nex.html.getOptions() );
-	$.nexWindow = $.extWindow = win;
+	var win = Nex.define('Nex.Window','Nex.Html').setXType('window');
 	win.extend({
 		version : '1.0',
 		_Tpl : {				
 		}
 	});
-	win.setOptions(function(){
+	win.setOptions(function(opt,t){
 		return {
 			prefix : 'nexwindow-',
-			autoRecovery : false,
+			autoDestroy : true,
 			autoResize : true,
+			_hasBodyView : true,
+			_checkScrollBar : false,
 			position : 'absolute',
 			border : true,
-			borderCls : [baseConf.borderCls,'nex-window-border'].join(' '),
-			containerCls : [baseConf.containerCls,'nex-window'].join(' '),
-			autoScrollCls : [baseConf.autoScrollCls,'nex-window-auto-scroll'].join(' '),
+			borderCls : [opt.borderCls,'nex-window-border'].join(' '),
+			containerCls : [opt.containerCls,'nex-window'].join(' '),
+			autoScrollCls : [opt.autoScrollCls,'nex-window-auto-scroll'].join(' '),
 			autoScroll : false,
 			autoShow : true,
 			closeToRremove : true,//关闭窗口后 销毁对象
@@ -51,7 +51,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 			minable : false,
 			maxable : false,
 			hideHeader : false,
-			headerSelectionable : false,
+			headerSelectionable : true,
 			closeable : false,
 			headerItemsCls : '',
 			footerItemsCls : '',
@@ -59,10 +59,9 @@ email:zere.nobo@gmail.com or QQ邮箱
 			footerItems : null,
 			html : '',
 			items : [],
-			padding : 0,//body的
-			style : '',//body的
+			padding : 0,
+			style : '',
 			renderTo : window,
-			isIE : !!window.ActiveXObject,
 			url : '',//支持远程创建 返回数据格式  json
 			cache : true,
 			dataType : 'json',
@@ -74,6 +73,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 			headerCls : '',
 			modalCls : '',
 			bodyCls : '',
+			bodyStyle : {},
 			icon : '',
 			iconCls : '',
 			iconTitle : '',
@@ -81,6 +81,16 @@ email:zere.nobo@gmail.com or QQ邮箱
 			autoSize : false,
 			width : 'auto',
 			height : 'auto',
+			animShow : false,//是否动画显示
+			animShowType : 'showInAt',
+			animHideType : 'showOutAt',
+			denyEvents : [ 'scroll' ],
+			animateShow : {
+				xtype : 'showInAt'	
+			},//动画显示函数
+			animateHide : {
+				xtype : 'showOutAt'		
+			},//动画关闭函数
 			maxWidth : function(){
 				var self = this;
 				var opt = self.configs;
@@ -127,7 +137,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 			var self = this;
 			var opt = self.configs;
 			
-			Nex.html.fn._sysEvents.apply(self,arguments);
+			Nex.Html.fn._sysEvents.apply(self,arguments);
 			
 			self.bind("onHeaderCreate",self._drag,self);
 			self.bind("onCreate",self._resizeable,self);
@@ -196,16 +206,16 @@ email:zere.nobo@gmail.com or QQ邮箱
 					var r = self.fireEvent("onWindowBeforeDrag",[e,_opt]);	
 					if( r === false) return r;
 				},
-				onStartDrag : function(left,top,e,_opt){
-					var r = self.fireEvent("onWindowStartDrag",[left,top,e,_opt]);	
+				onStartDrag : function(e,_opt){
+					var r = self.fireEvent("onWindowStartDrag",[e,_opt]);	
 					if( r === false) return r;
 				},
-				onDrag : function(left,top,e,_opt){
-					var r = self.fireEvent("onWindowDrag",[left,top,e,_opt]);	
+				onDrag : function(e,_opt){
+					var r = self.fireEvent("onWindowDrag",[e,_opt]);	
 					if( r === false) return r;
 				},
-				onStopDrag : function(left,top,e,_opt){
-					var r = self.fireEvent("onWindowStopDrag",[left,top,e,_opt]);	
+				onStopDrag : function(e,_opt){
+					var r = self.fireEvent("onWindowStopDrag",[e,_opt]);	
 					if( r === false) return r;
 				}
 			});
@@ -266,7 +276,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 			
 			opt.containerCls += ' nex-window-'+opt.position;
 			
-			Nex.html.fn.setContainer.call(self);
+			Nex.Html.fn.setContainer.call(self);
 			
 			self.unLockEvent('onContainerCreate');
 			/*var container = $('<div class="nex-window '+( opt.autoScroll ? 'nex-window-auto-scroll' : '' )+' nex-window-'+opt.position+' '+opt.cls+'" id="'+opt.id+'"></div>');
@@ -288,17 +298,26 @@ email:zere.nobo@gmail.com or QQ邮箱
 			if( opt.modal && ('modal' in opt.views) ) {
 				modal = opt.views['modal'];
 			}	
-			
-			container.hide();
-			
+			opt._isShow = false;
 			if( modal ) {
 				modal.hide();
 			}
-			
-			if( $.isFunction(func) ) {
-				func.call( self );	
+			if( opt.animShowType && opt.animShow ) {
+				var d = $.extend( {},opt.showAt,{ 
+					xtype : opt.animHideType || 'showAt',
+					source:container,
+					onShow : function(){
+						if( $.isFunction(func) ) {
+							func.call( self );	
+						}	
+					}
+				 } );
+				 
+				Nex.Create(d).show();
+			} else {
+				container.hide();
+				func.call( self );		
 			}
-			
 		},
 		_show : function(func){
 			var self = this,undef;
@@ -309,6 +328,11 @@ email:zere.nobo@gmail.com or QQ邮箱
 				modal = opt.views['modal'];
 			}
 			
+			if( opt._isShow ) {
+				return;	
+			}
+			opt._isShow = true;
+			//animateShow
 			self.setzIndex();//设置z-index 重要...
 			
 			if( opt.showAt.at ) {
@@ -317,16 +341,54 @@ email:zere.nobo@gmail.com or QQ邮箱
 			
 			opt.showAt.el = opt.showAt.el === undef ? (opt.point === null ? opt.renderTo : opt.point) : opt.showAt.el;
 			
-			container.show()
-					 .showAt(opt.showAt);
+			//container.show()
+			//		 .showAt(opt.showAt);
 			
 			if( modal ) {
 				modal.show();
 			}
-			
-			if( $.isFunction(func) ) {
-				func.call( self );	
+			var animShowType = 'showAt';
+			if( opt.animShow && opt.animShowType ) {
+				animShowType = opt.animShowType
 			}
+			//animShowType
+			var d = $.extend( {},opt.showAt,{ 
+				xtype : animShowType,
+				source:container,
+				onShow : function(){
+					if( $.isFunction(func) ) {
+						func.call( self );	
+					}	
+				}
+			 } );
+			Nex.Create(d).show();	
+			
+		},
+		resetPosition : function(){
+			var self = this,undef;
+			var opt = self.configs;		
+			var container = opt.views['container'];
+			if( opt.showAt.at ) {
+				opt.showAt.el = opt.showAt.at;
+			}
+			
+			opt.showAt.el = opt.showAt.el === undef ? (opt.point === null ? opt.renderTo : opt.point) : opt.showAt.el;
+			var d = $.extend( {},opt.showAt,opt.animateShow,{ 
+				source:container
+			 } );
+			
+			if( !opt.animShow ) {
+				d.xtype = 'showAt';	
+			}
+			
+			var anim = Nex.Create(d),
+				pos = {};
+			if( anim ) {
+				pos = anim.getShowPos();		
+			}
+			container.stop(true,true).animate( pos,200,function(){
+				self.fireEvent("onResetPosition",[container,opt]);													
+			} );
 		},
 		maxWindow : function(btn){
 			var self = this,undef;
@@ -462,7 +524,8 @@ email:zere.nobo@gmail.com or QQ邮箱
 			
 			self._show(function(){
 				self.resize();
-				self.fireEvent(e2,[container,opt]);					
+				self.fireEvent(e2,[container,opt]);		
+				self.fireEvent('onWindowShow',[opt]);					
 			});
 			
 		},
@@ -484,6 +547,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 						opt.views['modal'] = opt.views['modal'].detach();
 					}	
 					self.fireEvent('onCloseWindow',[container,opt]);
+					self.fireEvent('onWindowHide',[opt]);
 				});
 			}
 		},
@@ -621,7 +685,9 @@ email:zere.nobo@gmail.com or QQ邮箱
 				}
 				icon = '<'+opt.iconTag+' '+ititle+' class="nex-window-icon '+opt.iconCls+'" style="'+_icon+'"></'+opt.iconTag+'>';	
 			}
-			var header = $('<div class="nex-window-header '+opt.headerCls+'" id="'+opt.id+'_header" style=""><table class="nex-window-header-table" cellpadding="0" cellspacing="0" border="0"><tr><td>'+icon+'</td><td><span class="nex-window-title-text"></span></td></tr></table><div class="nex-window-tools"></div></div>');
+			//var header = $('<div class="nex-window-header '+opt.headerCls+'" id="'+opt.id+'_header" style=""><table class="nex-window-header-table" cellpadding="0" cellspacing="0" border="0"><tr><td>'+icon+'</td><td><span class="nex-window-title-text"></span></td></tr></table><div class="nex-window-tools"></div></div>');
+			var header = $('<div class="nex-window-header '+opt.headerCls+'" id="'+opt.id+'_header" style=""><div class="nex-window-tools"></div><div class="nex-window-header-title">'+icon+'<span class="nex-window-title-text"></span></div></div>');
+			
 			opt.views['header'] = header;
 			container.prepend(header);
 			if( !opt.headerSelectionable ) {
@@ -703,6 +769,37 @@ email:zere.nobo@gmail.com or QQ邮箱
 			self.addComponent( headerItem,headerItems );
 			return self;
 		},
+		bindBodyEvents : function(){
+			var self = this;
+			var opt = self.configs;	
+			var bd = opt.views['body'];
+			var callBack = function(type,e){
+				var r = self.fireEvent(type,[ this,e,opt ]);
+				if( r === false ) {
+					e.stopPropagation();
+					e.preventDefault();
+				}
+			};
+			bd.unbind('.window');
+			var events = {
+				'scroll.window' : function(e){
+					callBack.call(this,'onScroll',e);
+					var $this = $(this);
+					if( $this.scrollTop()<=0 ) {
+						self.fireEvent('onScrollTopStart',[ this,e,opt ]);		
+					} else if( $this.scrollLeft()<=0 ) {
+						self.fireEvent('onScrollLeftStart',[ this,e,opt ])
+					}
+					if( self.isScrollEnd( this,'top' ) ) {
+						self.fireEvent('onScrollTopEnd',[ this,e,opt ]);	
+					}
+					if( self.isScrollEnd( this,'left' ) ) {
+						self.fireEvent('onScrollLeftEnd',[ this,e,opt ]);	
+					}
+				}
+			};
+			bd.bind(events);
+		},
 		setBody : function(){
 			var self = this;
 			var opt = self.configs;	
@@ -711,12 +808,13 @@ email:zere.nobo@gmail.com or QQ邮箱
 			opt.views['body'] = bd;
 			container.append(bd);
 			bd.css('padding',opt.padding);
-			bd.css(opt.style);
+			bd.css(opt.bodyStyle);
+			self.bindBodyEvents();	 
 			self.fireEvent("onBodyCreate",[bd],opt);
 			return self;
 		},
 		setFooter : function(){
-			var self = this;
+			var self = this,undef;
 			var opt = self.C();	
 			var container = opt.views['container'];
 			
@@ -755,47 +853,45 @@ email:zere.nobo@gmail.com or QQ邮箱
 
 			modal.bind({
 				'click' : function(e){
-					self.fireEvent('onModalClick',[modal,opt]);
+					self.fireEvent('onModalClick',[modal,e,opt]);
 					$(document).trigger('click',[e]);
 					return false;
 				},
 				'dblclick' : function(e){
-					self.fireEvent('onModalDblClick',[modal,opt]);
+					self.fireEvent('onModalDblClick',[modal,e,opt]);
 					$(document).trigger('dblclick',[e]);
 					return false;
 				},
 				'mousedown' : function(e){
-					self.fireEvent('onModalMouseDown',[modal,opt]);
+					self.fireEvent('onModalMouseDown',[modal,e,opt]);
 					$(document).trigger('mousedown',[e]);
 					return false;	
 				},
 				'mouseup' : function(e){
-					self.fireEvent('onModalMouseUp',[modal,opt]);
+					self.fireEvent('onModalMouseUp',[modal,e,opt]);
 					$(document).trigger('mouseup',[e]);
 					return false;	
 				},
 				'keydown' : function(e){
-					self.fireEvent('onModalKeyDown',[modal,opt]);
+					self.fireEvent('onModalKeyDown',[modal,e,opt]);
 					$(document).trigger('keydown',[e]);
 					return false;		
 				},
 				'keyup' : function(e){
-					self.fireEvent('onModalKeyUp',[modal,opt]);
+					self.fireEvent('onModalKeyUp',[modal,e,opt]);
 					$(document).trigger('keyup',[e]);
 					return false;		
 				},
 				'mousewheel' : function(e){
-					self.fireEvent('onModalMouseWheel',[modal,opt]);
-					$(document).trigger('mousewheel',[e]);
-					return false;		
+					self.fireEvent('onModalMouseWheel',[modal,e,opt]);	
 				},
 				'mouseover' : function(e){
-					self.fireEvent('onModalMouseOver',[modal,opt]);
+					self.fireEvent('onModalMouseOver',[modal,e,opt]);
 					$(document).trigger('mouseover',[e]);
 					return false;		
 				},
 				'mouseout' : function(e){
-					self.fireEvent('onModalMouseOut',[modal,opt]);
+					self.fireEvent('onModalMouseOut',[modal,e,opt]);
 					$(document).trigger('mouseout',[e]);
 					return false;		
 				}
@@ -839,6 +935,27 @@ email:zere.nobo@gmail.com or QQ邮箱
 					}
 			}
 		},
+		getHeader : function(){
+			var self = this,
+				opt = self.configs;
+			return opt.views['header'];	
+		},
+		getHeaderItem : function(){
+			var self = this,
+				opt = self.configs;
+			return opt.views['headerItem'];	
+		},
+		getBody : function(){
+			var self = this,
+				opt = self.configs;
+			return opt.views['body'];
+		},
+		getFooter : function(){
+			var self = this,
+				opt = self.configs;
+			return opt.views['footer'];	
+		},
+		/*
 		onViewSizeChange : function(func){
 			var self = this;
 			var opt = self.C();	
@@ -847,6 +964,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 			self.resetModelSize();		
 			Nex.html.fn.onViewSizeChange.apply(self,arguments);
 		},
+		*/
 		/*onSizeChange : function(w,h){
 			var self = this,
 				opt=this.configs,
@@ -867,24 +985,36 @@ email:zere.nobo@gmail.com or QQ邮箱
 
 			var render = $(opt.renderTo);
 			
+			var  isWin = $.isWindow( opt.renderTo );
+			
 			var modal = opt.views['modal'];
 			
-			var w = $.isWindow( opt.renderTo ) ? 0 : parseInt(render.css('paddingLeft')) + parseInt(render.css('paddingRight'));
-			var h = $.isWindow( opt.renderTo ) ? 0 : parseInt(render.css('paddingTop')) + parseInt(render.css('paddingBottom'));
+			var w = isWin ? 0 : parseInt(render.css('paddingLeft')) + parseInt(render.css('paddingRight'));
+			var h = isWin ? 0 : parseInt(render.css('paddingTop')) + parseInt(render.css('paddingBottom'));
 			
-			//modal._outerWidth( render._outerWidth() );
-			//modal._outerHeight( render._outerHeight() );
-			modal._outerWidth( render._width() + w );
-			modal._outerHeight( render._height() + h );
+			var mw = render._width() + w,
+				mh = render._height() + h;
+			
+			if( isWin ) {
+				var winWidth = $(window).width();
+				var winHeight = $(window).height();
+				w = parseInt($(document.body).css('paddingLeft')) + parseInt($(document.body).css('paddingRight'));
+				h = parseInt($(document.body).css('paddingTop')) + parseInt($(document.body).css('paddingBottom'));
+				mw = Math.max( winWidth,$(document.body).width() + w );
+				mh = Math.max( winHeight,$(document.body).height() + h );
+			}
+			
+			modal._outerWidth( mw );
+			modal._outerHeight( mh );
 			
 			self.fireEvent('onModelSizeChange',[ opt ]);
 		},
-		resetViewSize : function(){
+		_setViewSize : function(){
 			var self = this,
 				opt=this.configs,
 				undef;
 			var container = opt.views['container'];	
-			var bd = opt.views['body'];
+			var bd = self.getBody();
 			
 			if( opt.realWidth !== 'auto' ) {
 				bd._outerWidth( container._width() );
@@ -897,8 +1027,10 @@ email:zere.nobo@gmail.com or QQ邮箱
 				} );
 				bd._outerHeight( container._height()-h );
 			}
+			self.fireEvent("onSetViewSize",[opt]);
 			
-			self.fireEvent('onViewSizeChange',[ opt ]);
+			self.resetModelSize();
+			//self.fireEvent('onViewSizeChange',[ opt ]);
 		},
 		initWH : function(w,h){
 			var self = this,
@@ -921,10 +1053,8 @@ email:zere.nobo@gmail.com or QQ邮箱
 				self.setWH();	
 				if( opt.refreshPosOnResize ) {
 					self.resetModelSize();
+					self.resetPosition();
 				}
-				if( opt.refreshPosOnResize ) {
-					self._show();
-				}	
 				
 			},0);
 			return self;
@@ -933,44 +1063,22 @@ email:zere.nobo@gmail.com or QQ邮箱
 		*清空window内容
 		*/
 		empytContent : function(){
-			var self = this;
-			var opt = self.C();		
-			$('#'+opt.id+'_body').empty();
-			if( opt.autoSize ) {
-				self.autoSize();	
-			}
+			return this.empty();
+		},
+		_addContent : function(items,after){
+			return this._insert( items,after );
 		},
 		/*
 		*向window追加内容
 		*/
-		addContent : function(items){
-			var self = this,undef;
-			var opt = self.C();
-			if( items === undef ) return;
-			var tbody = $('#'+opt.id+'_body');
-			if( tbody.length ) {
-				self.addComponent( tbody,items );	
-				if( opt.autoSize ) {
-					self.autoSize();	
-				}
-			}
-		},
-		_appendContent : function(){
-			var self = this;
-			var opt = self.C();	
-			var lbody = opt.views['body'];
-			//因为创建后立马写入内容，宽高都没设置，放到回调里
-			var items = opt['html'];
-			self.addComponent( lbody,items );
-			var items = opt['items'];
-			self.addComponent( lbody,items );
-			return lbody;
+		addContent : function(items,after){
+			return this.insert( items,after );
 		},
 		initWindow : function(){
 			var self = this,
 				opt=this.configs;
 				
-			Nex.html.fn.initComponent.apply(self,arguments);
+			Nex.Html.fn.initComponent.apply(self,arguments);
 			
 			var container = opt.views['container'];
 			container.hide();

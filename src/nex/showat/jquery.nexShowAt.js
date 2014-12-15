@@ -22,13 +22,14 @@ $("#t1").showAt("#t2"[,{xAlign:'right'}]);
 		getDefaults : function(opt){
 			var _opt = {
 				prefix : 'showAt-',
+				autoDestroy : true,
 				source : null,
+				autoShow : false,//是否自动显示
 				openAtOpt : true,//开启后 可使用参数 at 代替el来设置，只是助于理解
 				el : null,// 相当于at 或者 一个 坐标eg {left:0,top:2}
 				parent : document.body,//source 的父元素 会自动获取offsetParent
-				isIE : !!window.ActiveXObject,
 				autoRegion : true,//自动调整显示方位
-				visibleable : true,//必定可见
+				visibleable : true,//必定可见 相对于source的父元素
 				offsetX : 0,//正 负 分别代表外离 内缩
 				offsetY : 0,//同上
 				zAlign : 'y',// x:横 y:竖
@@ -74,14 +75,28 @@ $("#t1").showAt("#t2"[,{xAlign:'right'}]);
 				if( opt.el.is('body') ) {
 					opt.el = window;	
 				}
+			} else {
+				if( $(opt.el).is('body') ) {
+					opt.el = window;	
+				}
 			}
 			opt.el = (opt.el === document) ? window : opt.el;
+			
+			self.fireEvent("onCreate",[opt]);	
+			
 		},
 		_sysEvents : function(){
 			var self = this;
 			var opt = self.configs;
-			//self.bind("onMouseOver.over",self.onMouseOver,self);
+			self.bind("onCreate",self._checkToShow,self);
 			return self;
+		},
+		_checkToShow : function(){
+			var self = this;
+			var opt = self.configs;
+			if( opt.autoShow ) {
+				self.show();	
+			}		
 		},
 		//获取 source元素的 offsetParent
 		getRender : function(p){
@@ -94,7 +109,7 @@ $("#t1").showAt("#t2"[,{xAlign:'right'}]);
 				return  parent[0];	
 			}
 		},
-		//返回相对于parent的绝对位置
+		//返回相对于parent(renderTo)的绝对位置
 		getOffset : function(el){
 			var self = this,undef;
 			var opt = self.configs;	
@@ -257,27 +272,11 @@ $("#t1").showAt("#t2"[,{xAlign:'right'}]);
 		/*是否出现水平滚动条*/ 
 		//scrollHeight scrollWidth
 		hasScrollBarX : function(el){
-			var self = this;
-			var el = $(el);
-			var overflow = el.css('overflow');
-			var overflowX = el.css('overflowX');
-			overflowX = !overflowX ? overflow : overflowX;
-			if( el.get(0).scrollWidth <= el.width() ) {
-				return false;	
-			}
-			return self.inArray( overflowX,[ 'hidden','visible' ] ) === -1 ? true : false;
+			return Nex.hasScroll(el,'left');
 		},
 		/*是否出现垂直滚动条*/
 		hasScrollBarY : function(el){
-			var self = this;
-			var el = $(el);
-			var overflow = el.css('overflow');
-			var overflowY = el.css('overflowY');
-			overflowY = !overflowY ? overflow : overflowY;
-			if( el.get(0).scrollHeight <= el.height() ) {
-				return false;	
-			}
-			return self.inArray( overflowY,[ 'hidden','visible' ] ) === -1 ? true : false;	
+			return Nex.hasScroll(el);
 		},
 		adaptPosition : function(pos){
 			var self = this;
@@ -475,16 +474,19 @@ $("#t1").showAt("#t2"[,{xAlign:'right'}]);
 			var pos = self.getShowPos();
 			var r = self.fireEvent("onBeforeShow",[pos,opt]);
 			if( r === false ) return false;
+			var callBack = function(){
+				self.fireEvent("onShow",[pos,opt]);	
+			}
 			if( $.isFunction(opt.animate) ) {
-				opt.animate.call(self,opt.source,pos);	
+				opt.animate.call(self,opt.source,pos,callBack);	
 			} else {
 				var position = $(opt.source).css('position');
 				if( position === 'static' || position === 'relative' ) {
 					pos.position = 'absolute';
 				}
 				$(opt.source).css(pos).show();
+				callBack();
 			}
-			self.fireEvent("onShow",[pos,opt]);
 		}
 	});
 	$.fn.nexShowAt = function(options,conf){

@@ -371,7 +371,7 @@ v1.0
 				if( a[opt.sortField] >  b[opt.sortField] ) {
 					return isAsc ? 1 : -1;
 				} if( a[opt.sortField] === b[opt.sortField] ){
-					return -1;
+					return 0;
 				} else {
 					return isAsc ? -1 : 1;
 				}

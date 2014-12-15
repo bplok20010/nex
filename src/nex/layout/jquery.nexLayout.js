@@ -1,161 +1,173 @@
 /*
-layout - jQuery NEX
-nobo
+layout组件继承 html
+author:nobo
 zere.nobo@gmail.com
 qq : 505931977
-var drag = new ZUI.layout({renderTo:$('#drag')});
 */
 ;(function($){
 	"use strict";
-	var layout = Nex.widget('layout');
-	
-	$.nexLayout = $.extLayout = layout;
+	var layout = Nex.extend('Nex.Layout','Nex.Html').setXType('layout');
 	
 	layout.extend({
-		version : '1.0', 	
-		getDefaults : function(opt){
-			var _opt = {
-				prefix : 'nexLayout-',
-				autoResize : true,
-				renderTo: document.body,
-				easing : 'easeOutCirc',
-				disabled: false,
-				layouts : ['north','south','west','east'],
-				isCreate : false,
-				closeTime : 300,
+		version : '1.0',
+		_Tpl : {				
+		}
+	});
+	layout.setOptions(function( opt ){
+		return {
+			prefix : 'nexLayout-',
+			autoDestroy : true,
+			autoResize : true,
+			_hasBodyView : false,
+			_checkScrollBar : false,
+			position : 'relative',
+			renderTo: document.body,
+			width : '100%',
+			height : '100%',
+			easing : 'easeOutCirc',
+			layouts : ['north','south','west','east'],
+			isCreate : false,
+			closeTime : 300,
+			cls : '',
+			borderCls : [opt.borderCls,'nex-layout-border'].join(' '),
+			containerCls : [opt.containerCls,'nex-layout nex-layout-wrap'].join(' '),
+			autoScrollCls : '',
+			autoScrollRegionCls : 'nex-layout-auto-scroll',
+			borderRegionCls : 'nex-layout-region-border',
+			cssText : '',
+			style : {},//css
+			bodyCls : '',
+			bodyStyle : {},
+			padding : 0,
+			dblclickToClose : true,
+			_north : {
+				handles : 's',
+				"split" : true,
+				splitBtn : true,
+				splitSize : 5,
+				resizable : true,
+				isClosed : false,
+				autoScroll : false,
+				selectionable : true,
+				border : true,
+				borderCls : '',
+				attrs : {},
 				cls : '',
-				cssText : '',
+				clsText : '',
 				style : {},//css
 				padding : 0,
-				dblclickToClose : true,
-				_north : {
-					handles : 's',
-					"split" : true,
-					splitBtn : true,
-					splitSize : 5,
-					resizable : true,
-					isClosed : false,
-					autoScroll : false,
-					cls : '',
-					clsText : '',
-					style : {},//css
-					padding : 0,
-					html : '',
-					items : [],
-					maxSize : 0,//maxHeight 
-					minSize : 28,//minHeight
-					height : 80
-				},
-				_south : {
-					handles : 'n',
-					"split" : true,
-					splitBtn : true,
-					splitSize : 5,
-					resizable : true,
-					isClosed : false,
-					autoScroll : false,
-					cls : '',
-					clsText : '',
-					style : {},//css
-					padding : 0,
-					html : '',
-					items : [],
-					maxSize : 0,//maxHeight 
-					minSize : 28,//minHeight
-					height : 40
-				},
-				_east : {
-					handles : 'w',
-					"split" : true,
-					splitBtn : true,
-					splitSize : 5,
-					resizable : true,
-					isClosed : false,
-					autoScroll : false,
-					cls : '',
-					clsText : '',
-					style : {},//css
-					padding : 0,
-					html : '',
-					items : [],
-					maxSize : 0,//maxHeight 
-					minSize : 28,//minHeight
-					width : 80
-				},
-				_west : {
-					handles : 'e',
-					"split" : true,
-					splitBtn : true,
-					splitSize : 5,
-					resizable : true,
-					isClosed : false,
-					autoScroll : false,
-					cls : '',
-					clsText : '',
-					style : {},//css
-					padding : 0,
-					html : '',
-					items : [],
-					maxSize : 0,//maxHeight 
-					minSize : 28,//minHeight
-					width : 160
-				},
-				_center : {
-					minWidth : 20,
-					minHeight : 20,
-					autoScroll : false,
-					cls : '',
-					clsText : '',
-					style : {},//css
-					padding : 0,
-					html : '',
-					items : []
-				},
-				width : 0,
-				height : 0,
-				maxWidth : 0,
-				minWidth : 0,
-				maxHeight : 0,
-				minHeight : 0,
-				dir : '',
-				events : {
-					onCreate : $.noop,
-					onBeforeRegionCreate : $.noop,
-					onRegionCreate : $.noop,
-					onBeforeRegionRemove : $.noop,
-					onRegionRemove : $.noop,
-					onBeforeSplitDrag : $.noop,
-					onSplitDrag : $.noop,
-					onSplitStopDrag : $.noop
-				}
-			};
-			
-			var _opt = this.extSet(_opt);
-			
-			return $.extend({},_opt,opt);
-		}
+				html : '',
+				items : [],
+				maxSize : 0,//maxHeight 
+				minSize : 28,//minHeight
+				height : 80
+			},
+			_south : {
+				handles : 'n',
+				"split" : true,
+				splitBtn : true,
+				splitSize : 5,
+				resizable : true,
+				isClosed : false,
+				autoScroll : false,
+				selectionable : true,
+				border : true,
+				borderCls : '',
+				attrs : {},
+				cls : '',
+				clsText : '',
+				style : {},//css
+				padding : 0,
+				html : '',
+				items : [],
+				maxSize : 0,//maxHeight 
+				minSize : 28,//minHeight
+				height : 40
+			},
+			_east : {
+				handles : 'w',
+				"split" : true,
+				splitBtn : true,
+				splitSize : 5,
+				resizable : true,
+				isClosed : false,
+				autoScroll : false,
+				selectionable : true,
+				border : true,
+				borderCls : '',
+				attrs : {},
+				cls : '',
+				clsText : '',
+				style : {},//css
+				padding : 0,
+				html : '',
+				items : [],
+				maxSize : 0,//maxHeight 
+				minSize : 28,//minHeight
+				width : 80
+			},
+			_west : {
+				handles : 'e',
+				"split" : true,
+				splitBtn : true,
+				splitSize : 5,
+				resizable : true,
+				isClosed : false,
+				autoScroll : false,
+				selectionable : true,
+				border : true,
+				borderCls : '',
+				attrs : {},
+				cls : '',
+				clsText : '',
+				style : {},//css
+				padding : 0,
+				html : '',
+				items : [],
+				maxSize : 0,//maxHeight 
+				minSize : 28,//minHeight
+				width : 160
+			},
+			_center : {
+				minWidth : 20,
+				minHeight : 20,
+				autoScroll : false,
+				selectionable : true,
+				border : true,
+				borderCls : '',
+				attrs : {},
+				cls : '',
+				clsText : '',
+				style : {},//css
+				padding : 0,
+				html : '',
+				items : []
+			},
+			maxWidth : 0,
+			minWidth : 0,
+			maxHeight : 0,
+			minHeight : 0,
+			dir : '',
+			denyEvents : [ 'scroll' ],
+			events : {
+				onCreate : $.noop,
+				onBeforeRegionCreate : $.noop,
+				onRegionCreate : $.noop,
+				onBeforeRegionRemove : $.noop,
+				onRegionRemove : $.noop,
+				onBeforeSplitDrag : $.noop,
+				onSplitDrag : $.noop,
+				onSplitStopDrag : $.noop
+			}
+		};	
 	});
 	layout.fn.extend({
 		_init : function(opt) {
 			var self = this;
-			
-			if( !opt.renderTo ) return;
-			
-			//保存初始设置值
-			opt.__width = opt.width;
-			opt.__height = opt.height;
-			
-			var size = self.getResizeWH();
-			
-			opt.width = size.width;
-			opt.height = size.height;
-			
-			$(opt.renderTo).data('nex.layout', self);
-			
 			self.initOptions(opt);
-			
-			self.createLayouts();
-			
+			self.setContainer();
+			self.setBody();
+			self.initComponent();
 		},
 		initOptions : function(opt){
 			var self = this;
@@ -169,14 +181,61 @@ var drag = new ZUI.layout({renderTo:$('#drag')});
 			}
 			opt = $.extend(opt,cfs);
 		},
+		_setPadding : function(){
+			var self = this,
+				opt = self.configs;
+			var bd = self.getContainer();
+			bd.css('padding',opt.padding);
+		},
+		getBody : function(){
+			var self = this,
+				opt = self.configs;
+			return opt.views['body'];
+		},
+		setBody : function(){
+			var self = this;
+			var opt = self.configs;	
+			var container = opt.views['container'];
+			var bd = $( '<div class="nex-layout-container '+opt.bodyCls+'" id="'+opt.id+'_container" style=""></div>' );
+			opt.views['body'] = bd;
+			container.append(bd);
+			//bd.css('padding',opt.padding);
+			bd.css(opt.bodyStyle);
+			//self.bindBodyEvents();	 
+			self.fireEvent("onBodyCreate",[bd,opt]);
+			return self;
+		},
+		getBodyWidth : function(){
+			var vbody = this.getBody();
+			return vbody.width();	
+		},
+		getBodyHeight : function(){
+			var vbody = this.getBody();
+			return vbody.height();	
+		},
+		initComponent : function(){
+			var self = this;
+			var opt = self.configs;	
+			self.fireEvent('onInitComponent',[opt]);
+			//初始是不应该触发onSizeChange事件
+			self.lockEvent('onSizeChange');
+			self.resetHtmlSize();
+			self.unLockEvent('onSizeChange');
+			
+			self.createLayouts();
+			
+			self.fireEvent('onCreate',[opt]);
+			opt._isInit = false;
+		},
 		//系统事件
 		_sysEvents : function(){
 			var self = this;
 			var opt = self.configs;
+			Nex.Html.fn._sysEvents.apply(self,arguments);
 			//self.bind("onRegionSizeChange",self.setExpandSize);	
 			self.bind("onRegionCreate",self.bindReginEvent);
 		//	self.bind("onRegionCreate",self.onRegionCreate);
-			self.bind("onCreate",self.onCreate);	
+			//self.bind("onCreate",self.onCreate);	
 			self.bind("onRegionCreate",self.closeDefault);	
 			self.bind("onSplitBtnClick",self.splitClickToClose);
 			self.bind("onSplitDblClick",self.splitDblClickToClose);
@@ -211,7 +270,7 @@ var drag = new ZUI.layout({renderTo:$('#drag')});
 				}
 				var size = self._undef(opt[region]['height'],opt[region]['width']) + _s;
 				size = size < 0 ? 0 : size;
-				var layoutSize = {width:$("#"+opt.id+"_container")._width(),height:$("#"+opt.id+"_container")._height()};
+				var layoutSize = {width:$("#"+opt.id+"_container").width(),height:$("#"+opt.id+"_container").height()};
 				var maxHeight = 0,maxWidth = 0;
 				switch( region ) {
 					case 'south':
@@ -237,7 +296,7 @@ var drag = new ZUI.layout({renderTo:$('#drag')});
 				helper : bar,
 				axis :　axis,			 
 				cursor : cursor,
-				onBeforeDrag : function(e){
+				onBeforeDrag : function(e,ui){
 					var self = this;
 					var target = e.srcElement ? e.srcElement : e.target;
 					if( !$(target).hasClass('nex-layout-split') ) return false;
@@ -259,20 +318,20 @@ var drag = new ZUI.layout({renderTo:$('#drag')});
 					
 					self.__clone = clone;
 				},
-				onDrag : function(left,top,e){
+				onDrag : function(e,ui){
 					var self = this;
-					var r = self.fireEvent('onSplitDrag',[ region,left,top,e,opt ]);
+					var r = self.fireEvent('onSplitDrag',[ region,ui,e,opt ]);
 					if( r === false ) return r;
 					//return false;	
 				},
-				onStopDrag : function(left,top,e){
+				//如果要用 onStopDrag 那么 就需要使用setTimeout来调用_setRegionSize和fireEvent(onSplitStopDrag)
+				onAfterDrag : function(e,ui){
 					var self = this;
-					var opt = self.C();
 					$(bar).removeClass('nex-split-drag');
 					$(bar).css('zIndex',0);
 					self.__clone.remove();
-					_setRegionSize( left - opt._sLeft,top-opt._sTop );
-					self.fireEvent('onSplitStopDrag',[ region,left - opt._sLeft,top-opt._sTop,e,opt ]);
+					_setRegionSize( ui.left - ui._sLeft,ui.top-ui._sTop );
+					self.fireEvent('onSplitStopDrag',[ region,ui.left - ui._sLeft,ui.top-ui._sTop,ui,e,opt ]);
 				}
 			});
 		},
@@ -312,71 +371,6 @@ var drag = new ZUI.layout({renderTo:$('#drag')});
 			if( rg['isClosed'] ) {
 				self.closeRegion(region);	
 			}
-		},
-		width : function( width ){
-			var self = this;
-			var opt = self.configs;	
-			if( typeof width != 'undefined' ) {
-				self.setWH(width,opt.height);	
-				return;
-			}
-			return $("#"+opt.id+'_container')._width();
-		},
-		height : function( height ){
-			var self = this;
-			var opt = self.configs;	
-			if( typeof height != 'undefined' ) {
-				self.setWH(opt.width,height);	
-				return;
-			}
-			return $("#"+opt.id+'_container')._height();
-		},
-		initWH : function(w,h){
-			var self = this,
-				opt = self.C();
-			opt.__width = w;
-			opt.__height = h;
-			self.setWH(w,h);
-		},
-		setWH : function(w,h){
-			var self = this;
-			self.onSizeChange(w,h);
-			self.fireEvent("onSizeChange");
-		},
-		
-		//m : true 强制刷新
-		resize : function(m){
-			var self = this,
-				opt = self.C(),
-				undef;
-			
-			opt._rt = opt._rt || 0;
-			
-			if( opt._rt ) {
-				clearTimeout( opt._rt );	
-			}
-			
-			//var render = $(opt.renderTo);
-//			var _body = $(document.body);
-//			_body.addClass('nex-overflow-hidden');
-//			render.addClass('nex-overflow-hidden');
-			
-			opt._rt = setTimeout(function(){
-				self._setBodyOverflowHidden();		
-				var size = self.getResizeWH();
-				var w =  size.width;
-				var h =  size.height;		
-				if( m ) {
-					self.setWH(w,h);		
-				} else {
-					var  wh = self.checkSize( w,h );
-					if( wh.width != opt.width || wh.height != opt.height ) {
-						self.setWH(w,h);	
-					}
-				}
-				//_body.removeClass('nex-overflow-hidden');
-				//render.removeClass('nex-overflow-hidden');
-			},0);
 		},
 		bindReginEvent : function(region,lbody){
 			var self = this;
@@ -513,7 +507,7 @@ var drag = new ZUI.layout({renderTo:$('#drag')});
 			var self = this;
 			var opt = self.configs;
 			
-			var mod = Nex.layout._undef( mod,true );
+			var mod = self._undef( mod,true );
 			
 			var $region = opt[region].isClosed ? false : $("#"+opt.id+'_'+region);
 			var size = 0;
@@ -534,7 +528,7 @@ var drag = new ZUI.layout({renderTo:$('#drag')});
 			var self = this;
 			var opt = self.configs;
 			
-			var b = Nex.layout._undef( b,false );
+			var b = self._undef( b,false );
 			
 			if( self.inArray( region,opt.layouts ) == -1 ) { 
 				return self; 
@@ -543,8 +537,8 @@ var drag = new ZUI.layout({renderTo:$('#drag')});
 			var r = self.fireEvent('onBeforeRegionSizeChange',[region]);
 			if( r===false ) return r;
 			
-			var layoutW = self.width();
-			var layoutH = self.height();
+			var layoutW = self.getBodyWidth();
+			var layoutH = self.getBodyHeight();
 			
 			var isChange = false;
 			
@@ -636,8 +630,8 @@ var drag = new ZUI.layout({renderTo:$('#drag')});
 			
 			var mod = self._undef( mod,true );
 			
-			var layoutW = self.width();
-			var layoutH = self.height();
+			var layoutW = self.getBodyWidth();
+			var layoutH = self.getBodyHeight();
 			
 			if( self.inArray( region,['north','south'] ) != -1 ) {
 				
@@ -713,11 +707,13 @@ var drag = new ZUI.layout({renderTo:$('#drag')});
 					}
 				} else if( region == 'east' ) {
 					left = opt[region].isClosed ? layoutW : layoutW - self.getRegionSize('east') + ($split?$split._outerWidth():0);
-					$split.css({
-						left :　layoutW - self.getRegionSize('east'),
-						top :　self.getRegionSize('north'),
-						position : 'absolute'
-					});	
+					if( $split ) {
+						$split.css({
+							left :　layoutW - self.getRegionSize('east'),
+							top :　self.getRegionSize('north'),
+							position : 'absolute'
+						});	
+					}
 					if( mod ) {
 						$region.css({
 							left :　left,
@@ -739,7 +735,7 @@ var drag = new ZUI.layout({renderTo:$('#drag')});
 			return self
 		},
 		openRegion : function( region ){
-			var self = this;
+			var self = this,undef;
 			var opt = self.configs;
 			
 			if( region == 'center' ) {
@@ -761,8 +757,8 @@ var drag = new ZUI.layout({renderTo:$('#drag')});
 			
 			opt[region]['isClosed'] = false;
 			
-			var layoutW = self.width();
-			var layoutH = self.height();
+			var layoutW = self.getBodyWidth();
+			var layoutH = self.getBodyHeight();
 			
 			var $region = $("#"+opt.id+'_'+region);
 			switch( region ) {
@@ -797,7 +793,7 @@ var drag = new ZUI.layout({renderTo:$('#drag')});
 			}
 		},
 		closeRegion : function( region ){
-			var self = this;
+			var self = this,undef;
 			var opt = self.configs;
 			
 			if( region == 'center' ) {
@@ -818,15 +814,15 @@ var drag = new ZUI.layout({renderTo:$('#drag')});
 			
 			opt[region]['isClosed'] = true;
 			
-			var layoutW = self.width();
-			var layoutH = self.height();
+			var layoutW = self.getBodyWidth();
+			var layoutH = self.getBodyHeight();
 			//剔除当前正关闭的region
 			var regions =['north','south','west','east','center'];
 			var pos = self.inArray( region,regions );
 			if( pos !== -1 ) {
 				regions.splice(pos,1);
 			}
-			self.refresh(regions);
+			self.refresh();
 			//只设置当前正在关闭的split bar
 			self.setRegionPos(region,false);
 			
@@ -899,14 +895,26 @@ var drag = new ZUI.layout({renderTo:$('#drag')});
 					container.append(lns);
 				}
 			}
-			var lbody = $('<div class="nex-layout-body '+( opt[region]['autoScroll'] ? 'nex-layout-auto-scroll' : '' )+' nex-layout-'+region+'-body '+opt[region]['cls']+'"  id="'+opt.id+'_'+region+'_body"></div>');
+			var lbody = $('<div class="nex-layout-body '+( opt[region]['autoScroll'] ? opt.autoScrollRegionCls : '' )+' nex-layout-'+region+'-body '+opt[region]['cls']+'"  id="'+opt.id+'_'+region+'_body"></div>');
+			
+			lbody[0].style.cssText = opt[region]['cssText'];
 			
 			if( opt[region]['padding'] ) {
 				lbody.css('padding',opt[region]['padding'])	;
 			}
-			lbody.css(opt[region]['style'])	;
+			lbody.attr(opt[region]['attrs']).css(opt[region]['style']);
 			
 			ln.append(lbody);
+			
+			if( opt[region]['border'] ) {
+				ln.addClass( opt.borderRegionCls );	
+				ln.addClass( opt[region]['borderCls'] );	
+			}
+			
+			if( !opt.selectionable ) {	
+				ln.disableSelection();	
+			}
+			
 			return lbody;
 		},
 		_refresh : function(regions){
@@ -918,16 +926,22 @@ var drag = new ZUI.layout({renderTo:$('#drag')});
 				self.setRegionPos( regions[x]);	
 			}
 		},
-		refresh : function( regions ){
+		/*
+		*更新region的大小以及位置 @regions需要更新的regions Array , @m 是否更新后触发onResize事件 默认 true , false不触发
+		*/
+		refresh : function( regions,m ){
 			var self = this;
 			var opt = self.configs;	
-			
+			var m = self._undef( m,true );
 			var regions =regions || ['north','south','west','east','center'];
 			
 			self._refresh(regions);
-			
-			if( Nex.Manager ) {
-				setTimeout(function(){
+
+			if( Nex.Manager && m ) {
+				if( opt.__onresize ) {
+					clearTimeout( opt.__onresize );	
+				}
+				opt.__onresize = setTimeout(function(){
 					Nex.Manager.fireEvent("onResize",[opt.id]);		
 				},0);
 			}	
@@ -940,99 +954,26 @@ var drag = new ZUI.layout({renderTo:$('#drag')});
 			if( r === false ) return r;
 			self.refresh();
 		},
-		/*如果width height 设置的是百分比那么将返回百分比值，只对resize和初始创建时有效*/
-		getResizeWH : function(){
-			var self = this;
-			var opt = self.C();	
-			var width =  $(opt.renderTo)._width();
-			var height =  $(opt.renderTo)._height();		
-			var w = opt.__width === 0 ? width : opt.__width
-				,h = opt.__height === 0 ? height : opt.__height;
-			if( opt.__width.toString().indexOf("%") != -1 ) {
-				w = parseFloat(opt.__width)*width/100;
-			}
-			if( opt.__height.toString().indexOf("%") != -1 ) {
-				h = parseFloat(opt.__height)*height/100;
-			}
-			return {width:w,height:h};
+		_setViewSize : function(w,h){
+			var self = this,
+				opt = self.configs,
+				container = self.getContainer(),
+				vbody = self.getBody();
+			
+			vbody._outerWidth( container._width() );
+			vbody._outerHeight( container._height() );
+			
+			self.fireEvent("onSetViewSize",[opt]);	
+			
 		},
-		/*
-		*返回组件的最终宽高
-		*/
-		checkSize : function(width,height){
-			var self = this;
-			var opt = self.configs;	
-			
-			height -= isNaN(parseFloat(opt.cutHeight)) ? 0 : opt.cutHeight;
-			width -= isNaN(parseFloat(opt.cutWidth)) ? 0 : opt.cutWidth;
-			
-			if( opt.minWidth>0 ) {
-				width = Math.max(width,opt.minWidth);
+		resetViewSize : function( func ){
+			var self = this,
+				opt = self.configs;	
+			Nex.Html.fn.resetViewSize.apply(self,arguments);
+			if( !opt._isInit ) {
+				self.refresh();//解决初始时就调用refresh api
 			}
-			if( opt.minHeight>0 ) {
-				height = Math.max(height,opt.minHeight);
-			}
-			if( opt.maxWidth>0 ) {
-				width = Math.min(width,opt.maxWidth);
-			}
-			if( opt.maxHeight>0 ) {
-				height = Math.min(height,opt.maxHeight);
-			}
-			
-			return {
-					width : width,
-					height : height
-				};
-		},
-		setContainerSize : function(w,h){
-			var self = this;
-			var opt = self.configs;	
-			var render = $(opt.renderTo);
-			var container = self.getDom();
-			
-			var size = self.getResizeWH();
-			
-			opt.width = w || size.width;
-			opt.height = h || size.height;
-			
-			var wh = self.checkSize( opt.width,opt.height );
-			opt.width = wh.width;
-			opt.height = wh.height;
-			
-			container._outerWidth(opt.width);
-			container._outerHeight(opt.height);
-			
-			var containerInner = $("#"+opt.id+'_container');
-			containerInner._outerWidth( container._width() );
-			containerInner._outerHeight( container._height() );
-			
 			return self;
-		},
-		onSizeChange : function(w,h){
-			var self = this;
-			var opt = self.configs;	
-			//var r = self.fireEvent('onBeforeSizeChange',[w,h,opt]);
-			//if( r === false ) return r;
-			var render = $(opt.renderTo);
-			
-			var pWidth = render._width();
-			var pHeight = render._height();
-			
-			opt.width = w || opt.width;
-			opt.height = h || opt.height;	
-			
-			//检查自定义setWH 是否使用百分比做为单位
-			if( opt.width.toString().indexOf("%") != -1 ) {
-				opt.width = parseFloat(opt.width)*pWidth/100;
-			}
-			if( opt.height.toString().indexOf("%") != -1 ) {
-				opt.height = parseFloat(opt.height)*pHeight/100;
-			}
-			
-			self.setContainerSize(opt.width,opt.height);
-			
-			self.refresh();
-			//self.fireEvent('onSizeChange',[w,h,opt]);
 		},
 		//首字母大写
 		_toUpperCase : function(str){
@@ -1097,26 +1038,11 @@ var drag = new ZUI.layout({renderTo:$('#drag')});
 			
 			if( opt.isCreate ) return;
 			
-			//$(opt.renderTo).css({overflow:'hidden'});
-			
-			var wrap = $('<div id="'+opt.id+'" class="nex-layout nex-layout-wrap '+opt.cls+'"><div id="'+opt.id+'_container" class="nex-layout-container"></div></div>') ;
-			$(opt.renderTo).append( wrap );
-			if( opt.padding ) {
-				wrap.css({padding:opt.padding});
-			}
-			wrap.css( opt.style );
-			
-			self.setContainerSize();
-			
-			//wrap._outerWidth(opt.width);
-			//wrap._outerHeight(opt.height);
-			
-			
-
 			opt.layouts.push('center');
 			
 			var _l = ['north','south','west','east','center'];
 			var _lbody = {};
+			//初始化region和大小以及位置
 			for( var i=0;i<_l.length;i++ ) {
 				if( self.inArray( _l[i],opt.layouts ) == -1 ) continue;
 				var _lb = self._createRegion( _l[i] );	
@@ -1125,31 +1051,44 @@ var drag = new ZUI.layout({renderTo:$('#drag')});
 				//layout 不占用太多性能 可不考虑
 				self.setRegionSize( _l[i] );	
 				self.setRegionPos( _l[i] );		
-				
-				//self._appendContent(_l[i],_lb);
 			}
-			
-			/*var _l = ['north','south','west','east','center'];
-			for( var x=0;x<_l.length;x++ ) {
-				self.setRegionSize( _l[x] );	
-				self.setRegionPos( _l[x] );		
-			}*/
-			
 			
 			for( var i=0;i<opt.layouts.length;i++ ) {
 				self.fireEvent('onRegionCreate',[opt.layouts[i],_lbody[ opt.layouts[i] ]]);
 				self.fireEvent('on'+self._toUpperCase(opt.layouts[i])+'Create',[opt.layouts[i],_lbody[ opt.layouts[i] ]]);
 			}
 			
-			self.refresh();	
+			self._refresh();	
 			
 			for( var i=0;i<_l.length;i++ ) {	
 				self._appendContent(_l[i],_lbody[ _l[i] ]);
 			}
-			
 			opt.isCreate = true;
+		},
+		_insert : function( item , after , region ){
+			var self = this;
+			var opt = self.C();	
+			var region = self._undef( region,'center' );
+			var lbody = self.getRegionBody(region);
+			if( !lbody ) return self;
+			var list = self.addComponent( lbody,item,after );
 			
-			self.fireEvent('onCreate',[]);
+			return list;
+		},
+		_empty : function( region ){
+			var self = this;
+			var opt = self.C();	
+			var lbody = self.getRegionBody( region || 'center' );	
+			if( !lbody ) return self;
+			
+			lbody.empty();
+			
+			var ls = Nex.Manager._getDomComps( lbody );
+			$.each( ls,function(i,cmp){
+				cmp.removeCmp();	
+			} );
+			
+			return self;
 		}
 	});
 	$.fn.layout = function(options, param){
@@ -1177,7 +1116,7 @@ var drag = new ZUI.layout({renderTo:$('#drag')});
 				return;
 			}
 			options.target = $(this);
-			var layout = new Nex.layout(options);
+			var layout = new layout(options);
 			list.push(layout);
 		});
 		return list.length === 1 ? list[0] : list;

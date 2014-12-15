@@ -227,6 +227,34 @@ v 1.2.7
 var t = $("#"+opt.id+'_'+field["field"]+'_row_'+rowId+'_cell',tr);
 field['callBack'].call(self,t,rowId,field,rowData);
 29.新增独立api _setEmptyMsg 并取消!showHeader 不执行问题
+30.修正一个久远的BUG 缺少opt定义 eg:showColumn
+31. beforeSend 触发位置改变
+32.getRowData 获得的是副本数据
+33.新增onCreate事件
+34.新增绑定autoHeight事件并重新设置列宽
+35.优化部分函数的书写方式
+36.新增nowrap参数 控制是否换行
+37.优化hasScroll 在IE下的BUG
+38.forceFit在width等于百分比时调用性能优化
+39.优化改变列大小时不会触发headerColumn的click事件
+40.新增事件onSetColumns。 getColumns时 触发
+41.新增参数customColumnData 可针对单独列设置默认信息
+42.新增参数multiFromStr multiSplitStr multiFromStrData 可通过filed来开启多列
+43.优化setFieldWidth的效率，做了缓存机制
+44.修正了一个BUG header 单元格id不唯一问题
+45.修正onViewSizeChange添加缓存后导致初始加载时onViewSizeChange事件未触发 需要持续优化
+46.修正由于getRowData 返回不是引用而引起的一些bug
+47.修正autoHeight调用onViewSizeChange是不触发onViewSizeChange事件
+48.onShowGrid时调用autoHeight
+49.由于onViewSizeChange有缓存机制 只有改变的情况下才会触发，所以onShowGrid中绑定了isEmeptyMsg事件
+50.由于开启了多列功能所以在多列处理中新增判断是否有设置field
+51.新增全局变量 Nex.grid._colid
+52.onFinish 不触发问题 ?
+53.hideHeader 在加载数据时没有隐藏 ?
+54.修正了一个可能出现的bug
+	如果用户不设置columns 直接设置数据 而且数据的key是带多表头实现的 eg [{a_b_c:1}]这样的方式 会导致数据获取不正确或则说是需要用户手动配置 cutsomColumnsData:{'c':{index:'a_b_c'}}
+55.现在的多表头实现已经没问题，但是不是通过rowSpan colSpan来实现的，也考虑使用这个方法
+56.添加一种新的多列算法，目前可提供自由选择 参数 mulitEngine
 +----------------------------------------------------------------------------------------------------------------------------+
 */
 ;(function($){
@@ -237,10 +265,14 @@ field['callBack'].call(self,t,rowId,field,rowData);
 	
 	dataGrid.extend({
 		version : '1.2.7', 
+		__resizing : false,
+		__moving : false,
+		_colid : 1,
 		getDefaults : function(opt){
 			var _opt = {
 				prefix : 'datagrid_',
 				autoResize : true,
+				renderTo : document.body,
 				title : '',//为空不显示标题
 				cls : '',//自定义CSS
 				iconCls : '',//datagrid 标题的icon样式
@@ -250,6 +282,7 @@ field['callBack'].call(self,t,rowId,field,rowData);
 				rowNumbersWidth : false,//左侧数字列表 一般设为24px 
 				rowNumbersExpand: false,// false : 索引 ,auto : 当前显示数据的索引 , 字符串时 自定义模版
 				rowNumbers2Row : true,//开启当rowNumbers2Row click的时候 选择当前行
+				nowrap : true,//是否换行
 				rowTpl : '',//grid 自定义行模板
 				showHeader : true,//显示header
 				showFooter : false,
@@ -274,8 +307,13 @@ field['callBack'].call(self,t,rowId,field,rowData);
 				_loadRowing : false,
 				_tq : 0,
 				_initLazy : true,
-				padding : 8,
+				cellpPadding : 8,//因为padding 有别的用途 这里的padding 改成cellpPadding
 				multiColumns : true,
+				mulitEngine : 1,//第一种方法 可设置 1 2
+				multiColumnsAlign : 'center',
+				multiFromStr : true,//开启支持以字符串形式的方式实现 。multiColumns必须开启
+				multiSplitStr : '_',//分割字符
+				multiFromStrData : {},//multiFromStr 字符串开启后 可以为不同层数的单元格设置配置信息
 				autoHeight : false,//如果为 true height参数无效，并且grid高度会自动调整高度
 				minAutoHeight : 50,//开启autoHeight时 视图部分最小高度
 				maxAutoHeight : 0,//开启autoHeight时 视图部分最大高度 0表示不限制
@@ -302,19 +340,25 @@ field['callBack'].call(self,t,rowId,field,rowData);
 				moveColumnTm : 500,//按下多少秒后开始移动列
 				moveColumns : true,
 				forceFit:false,//自动设置列宽
-				_columnMetaData : {
+				forceFitVisible : true,//列是否始终保持可见
+				_columnMetaData : {//默认列信息
 					field : '',
 					index : '',//数据索引，默认==field
 					title : '',
 					width : '120px',//默认的列宽,
+					_fieldWidth : 0,//如果width是百分比 那么这个就是计算百分比后的宽度
 					minWidth : 20,//默认最小宽度
 					maxWidth : null,
 					align : 'left',
+					valign : 'middle',//body里的垂直居中
 					_expand : false,//自定义列内容
 					callBack : $.noop,
 					hcls : '',//header cell自定义css
 					bcls : '',//body cell自定义css
 					fcls : '',//footer cell自定义css
+					_icon : '',
+					iconCls : '',
+					icon : '',
 					sortable : false, 
 					textLimit : false,//当处理大数据的时候 性能消耗比较厉害， 不建议开启了
 					fitColumn : true,//改变列大小
@@ -323,6 +367,8 @@ field['callBack'].call(self,t,rowId,field,rowData);
 					forceFit : true,//接受forceFit开启时自动设置列大小 checkbox edit 列会设置为false
 					disabled : false//当前列不可用
 				},
+				//用户可针对某一列设置默认信息
+				customColumnData : {},
 				readerDef : '_default_',
 				textLimit : false,//文字溢出总开关 已经改用CSS控制，请不要设置
 				textLimitDef : '...',
@@ -366,6 +412,7 @@ field['callBack'].call(self,t,rowId,field,rowData);
 				eventMaps : {},
 				events : {
 					onStart : $.noop,//创建开始 1
+					onCreate : $.noop,//创建开始 1
 					onViewCreate : $.noop,
 					onShowContainer : $.noop,
 					onFinish : $.noop,//创建结束 1
@@ -527,9 +574,9 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			'view2_header_inner_row' : '',//改用模版函数代替
 			'view2_header_inner_row_bak' : '<tr class="datagrid-header-row">'
 											+'<% var i=0;len = fields.length;  for(;i<len;i++) {%>'
-											+'<td id="datagrid_cols_<%=fields[i]["_colid"]%>" class="datagrid_<%=fields[i]["_colid"]%>" field="<%=fields[i]["field"]%>" align="<%=fields[i]["align"]%>">'
+											+'<td id="<%=opt.id%>_cols_<%=fields[i]["_colid"]%>" class="datagrid_<%=fields[i]["_colid"]%>" field="<%=fields[i]["field"]%>" align="<%=fields[i]["align"]%>">'
 												+'<div class="datagrid-header-wrap" field="<%=fields[i]["field"]%>" >'
-													+'<div id="datagrid_cell_header_<%=fields[i]["_colid"]%>" class="datagrid-cell datagrid-cell-<%=fields[i]["_colid"]%> datagrid-cell-header-<%=fields[i]["_colid"]%> <%=fields[i]["hcls"]%>" >'
+													+'<div id="<%=opt.id%>_cell_header_<%=fields[i]["_colid"]%>" class="datagrid-cell datagrid-header-cell <%=opt.nowrap ? "datagrid-header-cell-nowrap":""%> datagrid-cell-<%=fields[i]["_colid"]%> datagrid-cell-header-<%=fields[i]["_colid"]%> <%=fields[i]["hcls"]%>" >'
 														+'<span><%=fields[i]["title"]%></span>'
 													+'</div>'
 												+'</div>'
@@ -578,7 +625,7 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			
 			self.bind("onSetPk",self.setPk);
 			
-			self.bind("onSizeChange",self.onFinishFieldWidth);
+			self.bind("onSizeChange",self.refreshColumnsWidth);
 			self.bind("onShowGrid",self.resetHeader);
 			
 			self.bind("onScrollBar",self.onScrollBar);
@@ -600,9 +647,23 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			
 			self.bind("onFieldWidthChange",self.setForceFitColumn);
 			
+			self.bind("onAutoHeight",function(){
+				var self = this,
+					opt = this.configs;
+				if( !opt.forceFit ) {	
+					var columns = opt.columns;
+					self.lockMethod( 'resetViewSize' );
+					$.each(columns,function(i,column){
+						if( column.width.toString().indexOf("%") != -1 ) {
+							self.setFieldWidth( column.field,column.width );
+						}
+					});
+					self.unLockMethod( 'resetViewSize' );
+				}
+			});//autoHeight后滚动条会消失 最好就是重设宽度
 			self.bind("onViewSizeChange",self._autoHeight);
 			self.bind("onViewSizeChange",self.onFitColumn);
-			self.bind("onViewSizeChange",self.isEmptyGrid);
+			self.bind("onViewSizeChange",self.isEmptyGrid);//改变大小
 			self.bind("onShowLazyRows",self.onDisplayField);//隐藏列
 			
 			self.bind("onUpdateHeaderRow",self.onDisplayField);//隐藏列
@@ -616,14 +677,16 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			//selectRows = []
 			self.bind("onShowGrid",self._selectDefRows);
 			
-			self.bind("onShowGrid",self.onFinishFieldWidth);
+			self.bind("onShowGrid",self._autoHeight);
+			self.bind("onShowGrid",self.isEmptyGrid);//创建
+			//self.bind("onShowGrid",self.refreshColumnsWidth);
+			self.bind("onViewSizeChange",self.refreshColumnsWidth);
 		},
 		
 		showLoading : function(msg,render){
 			var self = this;	
 			var opt = self.configs;
 			var msg = typeof msg === 'undefined' ? opt.loadMsg : msg;
-			
 			if( opt._lmt ) {
 				clearTimeout(opt._lmt);	
 			}
@@ -714,7 +777,7 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			var columnName = self._undef(columnName,false);	
 			var proto = self._undef(proto,false);	
 			
-			if(columnName === false ) return self;
+			if(columnName === false ) return null;
 			
 			//var fields = self.getColumns(true);//获取columns元数据 ？？ 想不起为啥以前要获取元数据了
 			//var fields = opt.columns;
@@ -731,7 +794,7 @@ field['callBack'].call(self,t,rowId,field,rowData);
 				return field;
 			} else {
 				if(typeof value === 'undefined') {
-					return field[proto];
+					return self._undef(field[proto],null);
 				} else {
 					field[proto] = value;
 					
@@ -1061,33 +1124,6 @@ field['callBack'].call(self,t,rowId,field,rowData);
 		},
 		//setExpandEvent : function(t,rowId,rowData){},
 		/*
-		* 获取浏览器滚动条大小
-		*/
-		getScrollbarSize: function () {
-			var self = this,
-				opt = self.configs;
-            if (!opt.scrollbarSize) {
-                var db = document.body,
-                    div = document.createElement('div');
-
-                div.style.width = div.style.height = '100px';
-                div.style.overflow = 'scroll';
-                div.style.position = 'absolute';
-
-                db.appendChild(div); 
-
-                
-                opt.scrollbarSize = {
-                    width: div.offsetWidth - div.clientWidth,//竖
-                    height: div.offsetHeight - div.clientHeight//横
-                };
-
-                db.removeChild(div);
-            }
-
-            return opt.scrollbarSize;
-        },
-		/*
 		* 滚动到指定列
 		*  @field {String} 列名
 		*/
@@ -1225,9 +1261,20 @@ field['callBack'].call(self,t,rowId,field,rowData);
 		_autoHeight : function(){
 			var self = this;
 			var opt = self.configs;
+			/*
 			if( opt.autoHeight ) {
 				self.autoHeight();		
+			}	
+			*/
+			if( opt._atuoHTime ) {
+				clearTimeout( opt._atuoHTime )	
 			}
+			opt._atuoHTime = setTimeout(function(){
+				if( opt.autoHeight ) {
+					self.autoHeight();		
+				}	
+			},0);
+			
 		},
 		/*
 		* 只适应高度
@@ -1261,13 +1308,6 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			var _f = 0;
 			if( !opt.forceFit ) {
 				//判断是否出现了水平滚动条
-				/*
-				//bug fix IE下scrollWidth在overflow hidden下不正确
-				var header = $("#datagrid-view2-header-inner-wraper-"+opt.id);
-				if( header.get(0).scrollWidth>header.outerWidth() ) {
-					_f = scrollbarSize.height;
-				}
-				*/
 				var header = $("#view2-datagrid-header-"+opt.id);
 				var headerInner = $("#view2-datagrid-header-inner-htable-"+opt.id);
 				if( headerInner._outerWidth()>header._outerWidth() ) {
@@ -1286,9 +1326,20 @@ field['callBack'].call(self,t,rowId,field,rowData);
 				if(i == 'grid') continue;
 				h += views[i]._outerHeight(true);
 			}
-
+			
 			self.onSizeChange( opt.width,height+h );
-			self.onViewSizeChange();
+			var r = self.onViewSizeChange();
+			if( r ) {
+				self.fireEvent("onViewSizeChange",[opt]);	
+			}
+			/*self.methodInvoke('resetViewSize',function(){
+				self.fireEvent("onAutoHeight",[opt]);					   
+			});*/
+			
+			//如果是opt.autoHeight = true 应该把高度设置给grid
+			if( opt.autoHeight ) {
+				opt.height = height+h;	
+			}
 			
 			self.fireEvent("onAutoHeight",[opt]);
 		},
@@ -1359,6 +1410,7 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			//解决IE下耗时问题 方案1
 			//grid.data('_width',grid.width());
 			//grid.data('_height',grid.height());
+			return true;
 		},
 		/*
 		* 更新grid视图部分宽高
@@ -1371,8 +1423,10 @@ field['callBack'].call(self,t,rowId,field,rowData);
 				clearTimeout(opt.__svt);	
 			}
 			opt.__svt = setTimeout(function(){
-				self.onViewSizeChange();
-				self.fireEvent("onViewSizeChange",[opt]);
+				var r = self.onViewSizeChange();
+				if( r ) {
+					self.fireEvent("onViewSizeChange",[opt]);
+				}
 				opt.__svt = 0;
 				if( func && $.isFunction(func) ) {
 					func();
@@ -1380,20 +1434,20 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			},0);
 			
 		}, 
-		setViewSize : function(){
+		setViewSize : function(func){
 			var self = this;
-			self.methodInvoke('resetViewSize');
+			self.methodInvoke('resetViewSize',func);
 			//this.resetViewSize();
 		},
-		onViewSizeChange : function( roll ){
+		_setViewSize : function(){
 			//var s = $.now();
 			var self = this,
 				opt = self.configs,
 				gid = opt.gid;
-			var roll = self._undef( roll,true );
 			var grid = $(gid);
-			var w = grid._width();//列太多，会导致获取时间成正比
-			var	h = grid._height();
+			
+			var w = grid.width();//列太多，会导致获取时间成正比
+			var	h = grid.height();
 			
 			var view1 = $("#view1_"+opt.id);
 			var view2 = $("#view2_"+opt.id);
@@ -1447,11 +1501,42 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			//开启显示footer后,如果数据过少会导致不粘合在一起问题,觉得不需要
 			if( opt.showFooter ) {}
 			
+			self.fireEvent("onSetGridViewSize",[opt]);
+		},
+		onViewSizeChange : function( roll ){
+			//var s = $.now();
+			var self = this,
+				opt = self.configs,
+				gid = opt.gid;
+			var roll = self._undef( roll,true );
+			
+			//self._setViewSize();
+			self.methodInvoke('_setViewSize');
+			
 			if( roll ) {
-				self.onScroll(true);
+				self.methodInvoke('onScroll',true);
 			}
 			
-			self.fireEvent("onSetGridViewSize",[opt]);
+			//缓存机制
+			//因为grid特殊 所以应该判断是否出现滚动条
+			var hasScrollLeft = self.hasScroll( opt.gbody,'left' );
+			var hasScrollTop = self.hasScroll( opt.gbody,'top' );
+			var barSize = self.getScrollbarSize();
+			
+			var _gbodyWidth = opt.gbody._width() - ( hasScrollTop ? barSize.y : 0 );
+			var _gbodyHeight = opt.gbody.height() - ( hasScrollLeft ? barSize.x : 0 );
+			
+			if( opt._gbodyWidth && opt._gbodyHeight ) {
+				if( (opt._gbodyWidth == _gbodyWidth) && (opt._gbodyHeight == _gbodyHeight) ) {
+					return false;
+				}
+			} 
+			//设置缓存
+			opt._gbodyWidth = _gbodyWidth;
+			opt._gbodyHeight = _gbodyHeight;
+			
+			
+			return true;
 		},
 		//数组移动算法
 		// pos 要移动的元素
@@ -1634,7 +1719,7 @@ field['callBack'].call(self,t,rowId,field,rowData);
 		*  @rid {int} 行id或者主键
 		*  @isPK {boolean} 默认false,true代表根据主键获取数据(可选)
 		*/
-		getRowData : function (rid,isPK){
+		_getRowData : function(rid,isPK){
 			var self = this;
 			var opt = self.configs;
 			
@@ -1642,12 +1727,14 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			
 			var data = isPK ? self.getData() : opt.data;
 			
+			var rd = false;
+			
 			if(!isPK) {
 				var tr = $("#"+opt.id+"-row-"+rid);
 				if( tr.size() ) {
-					return tr.data('rowData');	
+					rd = tr.data('rowData');	
 				} else {
-					return data[rid];	
+					rd = data[rid];	
 				}
 				
 			} else {
@@ -1656,11 +1743,24 @@ field['callBack'].call(self,t,rowId,field,rowData);
 					len = data.length;
 				for(;i<len;i++) {
 					if(data[i][pk] == rid) {
-						return data[i];
+						rd = data[i];
+						break;
 					}	
 				}
 			}
-			return false;
+			
+			return self._undef(rd,false);
+		},
+		/*
+		* 获取指定行数据 参考_getRowData
+		*  返回的是一个副本数据
+		*/
+		getRowData : function (rid,isPK){
+			var data = this._getRowData( rid,isPK );
+			if( data ) {
+				data = $.extend( {},data );		
+			}
+			return data;
 		},
 		/*
 		* 获取指定主键的行id
@@ -1728,11 +1828,12 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			data[field] = value;
 			//同时修改元数据
 			var _d = false;
-			
+			//这里应该不用再修改，因为他们是引用同一个对象
 			if( typeof data[opt.pk] != "undefined" ) {
-				_d = self.getRowData( data[opt.pk],true);
-				if( _d )
+				_d = self._getRowData( data[opt.pk],true);
+				if( _d ) {
 					_d[field] = value;
+				}
 			}
 			
 			return true;
@@ -1771,12 +1872,14 @@ field['callBack'].call(self,t,rowId,field,rowData);
 				
 			field = self.getRealField(field);
 			
-			var data = this.getRowData(rid);
+			var data = this._getRowData(rid);
 			
-			if( typeof data == 'undefined' )
+			if( !data ) {
 				return "";
-			if( typeof data[field] == 'undefined' )
+			}
+			if( typeof data[field] == 'undefined' ) {
 				return "";
+			}
 			
 			return mod?data[field]:self._cellReader( data[field], self.getColumnData(field,'reader') ,data ,rid,field);
 		},
@@ -1811,13 +1914,15 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			}
 
 			self.setRowData(rid,_field,value);
+			rowData = self.getRowData(rid);//getRowData返回的是非引用数据 所以必须要在数据更新后再次获取
 			
 			var _colid = self.getColumnData( field,'_colid' );
+			_colid = _colid === null ? '' : _colid;
 			
-			var t = $("#"+opt.id+"_"+_colid+"_row_"+rid+"_cell");
-			if( !t.size() ) {
+			var t = _colid == '' ? $() : $("#"+opt.id+"_"+_colid+"_row_"+rid+"_cell");
+			if( !t.size() && _colid!=='' ) {
 				var rows = "#"+opt.id+"-row-"+rid+",#"+opt.id+"-view1-row-"+rid;
-				var t = $(rows).find("td[field='"+field+"'] div.datagrid-cell");
+				var t = $(rows).find("td[field='"+field+"'] .datagrid-cell");
 			}
 			if( t.size() ) {
 				var _expand = self.getColumnData(field,'_expand');
@@ -2045,14 +2150,34 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			var self = this,
 			opt = self.configs;
 			var columns = opt.columns;
-			
+			var nd = false;
+			self.lockMethod( 'resetViewSize' );
+			//self.lockEvent("onFieldWidthChange");
 			$.each(columns,function(i,column){
 				if( column.width.toString().indexOf("%") != -1 ) {
+					nd = true;
 					self.setFieldWidth( column.field,column.width );
 				}
 			});
+			//self.unLockEvent("onFieldWidthChange");
 			
+			/*if( nd && opt.forceFit ) {
+				self.forceFitColumn();	
+			}*/
+			
+			self.unLockMethod( 'resetViewSize' );
+			if( nd ) {
+				self.lockMethod("onScroll");
+				self.lockEvent("onScroll");
+				self.methodInvoke('resetViewSize',function(){
+					self.unLockMethod("onScroll");	
+					self.unLockEvent("onScroll");
+				});
+			}
 			return self;
+		},
+		refreshColumnsWidth : function(){
+			return this.onFinishFieldWidth();	
 		},
 		//初始化宽度
 		_initFieldWidth : function(){
@@ -2067,36 +2192,26 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			var gridWidth = $("#view_"+opt.id).width();//不要用_width 因为grid表格一定会设置宽度
 			var view1_w = $("#view1-datagrid-header-inner-htable-"+opt.id)._outerWidth(); 
 			w = gridWidth - parseFloat( view1_w );
-			/*
-			//目前应该不需要判断是否出现滚动条
-			var scrollbarSize = self.getScrollbarSize();
-			//判断是否出现了垂直滚动条
-			var body = $("#view2-datagrid-body-"+opt.id);
-			w = body.outerWidth();
-			var sh = body.get(0).scrollHeight;
-			if( sh > body.outerHeight() ) {
-				w -= scrollbarSize.width;//减滚动条宽度
-			}
-			*/
+			
 			$("#"+opt.id+"_css").remove();
 			var style = [];
 			style.push('<style type="text/css" id="'+opt.id+'_css">');
 			//datagrid_cols_
 			for(var i=0;i<columns.length;i++) {
 				var column = columns[i];
-				var _colpadding = opt.padding;
+				var _colpadding = opt.cellpPadding;
 				if( '_colpadding' in column ) {
 					_colpadding	= parseFloat(column._colpadding);
 				} else {
-					var _colpadding = $('#datagrid_cols_' + column['_colid']);
-					var cell_colpadding = $('#datagrid_cell_header_' + column['_colid']);
+					var _colpadding = $('#'+opt.id+'_cols_' + column['_colid']);
+					var cell_colpadding = $('#'+opt.id+'_cell_header_' + column['_colid']);
 					if( _colpadding.size() ) {
 						var _w = _colpadding.outerWidth()-cell_colpadding._width();
 						_w = _w<0?0:_w;	
 						_colpadding = _w;
 						column._colpadding = _colpadding;
 					} else {
-						_colpadding = opt.padding;	
+						_colpadding = opt.cellpPadding;	
 						column._colpadding = _colpadding;
 					}
 				}
@@ -2115,8 +2230,10 @@ field['callBack'].call(self,t,rowId,field,rowData);
 					width = Math.min(maxWidth,width);
 				}
 				
-				var minWidth = columns[i]['minWidth'];
+				var minWidth = column['minWidth'];
 				width = width>=minWidth ? width : minWidth;
+				
+				column._fieldWidth = width;
 
 				width -= column._colpadding;
 				
@@ -2125,10 +2242,8 @@ field['callBack'].call(self,t,rowId,field,rowData);
 				} else {
 					width = Math.floor(width); 	
 				}
-				//width = Math.floor(width); 
-				//width = self.str_number( width,0 );
 				
-				var css = '#'+opt.id+' .datagrid-cell-'+column['_colid']+'{width:'+width+'px;}';	
+				var css = ['#',opt.id,' .datagrid-cell-',column['_colid'],'{width:',width,'px;}'].join('');	
 				style.push(css);
 			}
 			style.push('</style>');
@@ -2142,25 +2257,28 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			var self = this,
 			opt = self.configs;
 			var column = self.getColumnData(field);
+			if( column === null ) {
+				return false;	
+			}
 			var _colid = column._colid;
 			var real = self._undef(real,false);
 			var width = self._undef(width,120);
-			//self._setFieldWidth(field,width,real);
+
 			if( width.toString().indexOf("%") != -1 ) {
 				var w = 0;
-				var scrollbarSize = self.getScrollbarSize();
-				//判断是否出现了垂直滚动条
 				var body = $("#view2-datagrid-body-"+opt.id);
-				w = body._outerWidth();
-				var sh = body.get(0).scrollHeight;
-				if( sh > body._outerHeight() ) {
-					w -= scrollbarSize.width;//减滚动条宽度
+				//判断是否出现了垂直滚动条
+				if( body.size() && self.hasScroll( body[0],'top' ) ) {
+					var scrollbarSize = self.getScrollbarSize();
+					w = body.width() - scrollbarSize.width;//减滚动条宽度
+					width = parseFloat(width)*w/100;
+				} else {
+					var body = $("#view2-datagrid-header-inner-"+opt.id);
+					width = parseFloat(width)*(body.width())/100;
 				}
-				width = parseFloat(width)*w/100;
 			} else {
 				width = parseFloat(width);
 			}
-
 			//maxWidth
 			var maxWidth = column.maxWidth;
 			if( maxWidth !== null ) {
@@ -2172,18 +2290,22 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			width = width>=minWidth ? width : minWidth;
 			
 			var changeWidth = width;
+			//如果当前值和上一次的_realWidth值相同，那么列宽并没有改变不需要重设
+			if( column._fieldWidth && column._fieldWidth == changeWidth ) {
+				return false;//列宽并没有改变 不需要设置
+			}
 			
 			if( !real ) {
 				width -= column._colpadding;
 			}
-			
+			//保留几位小数点 不要开启
 			if( opt._colWidthExt ) {
 				width = self.str_number( width,opt._colWidthExt );	
 			} else {
 				width = Math.floor(width); 	
 			}
 			
-			var cellSelector = "#"+opt.id+" .datagrid-cell-"+_colid;
+			var cellSelector = ["#",opt.id," .datagrid-cell-",_colid].join('');
 			
 			var style = $("#"+opt.id+'_css').get(0);
 			if( !style ) return false;
@@ -2208,6 +2330,8 @@ field['callBack'].call(self,t,rowId,field,rowData);
 				}
 				
 			}
+			//作为缓存用，判断是否改变
+			column._fieldWidth = changeWidth;
 			return changeWidth;
 		},
 		/*
@@ -2223,9 +2347,11 @@ field['callBack'].call(self,t,rowId,field,rowData);
 
 			var _c = self.getColumnData(field);
 			if( _c === null ) return width;
-			
+			//var _fieldWidth = _c._fieldWidth;
 			var changeWidth = self._setFieldWidth(field,width,real);
-
+			if( changeWidth === false ) {
+				return false;	
+			}
 			//self.onScroll(true);
 			var w = _c['width'];
 			if( width.toString().indexOf("%") != -1 ) {
@@ -2241,22 +2367,23 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			}
 			
 			self.fireEvent("onFieldWidthChange",[field,changeWidth,width,w,opt]);
-
+			//作用是 如果开启了autoHeight emptyMsg 需要通知他们更新宽度或高度
+			//方式一
+			//var r = self.onViewSizeChange( false );
+			//if( r ) {
+			//	self.fireEvent("onViewSizeChange",[opt]);
+			//}
+			//方式二
 			self.lockEvent("onScroll");
-			//self.resetViewSize();
 			self.methodInvoke('resetViewSize');
 			self.unLockEvent("onScroll");
-
-			/*检查文字是否超出边界*/
-			self.setGridHeaderTextLimit();
-			self.setGridBodyTextLimit(field);
 			
 			return changeWidth;
 		},
 		setForceFitColumn : function( field,w ){
 			var self = this,
 			opt = self.configs;	
-			
+	
 			var column = self.getColumnData(field);
 			if( opt.forceFit && column.forceFit ) {
 				self.onFitColumn( field,w );
@@ -2275,29 +2402,24 @@ field['callBack'].call(self,t,rowId,field,rowData);
 		* fields {Array} 不需要自适应的列(可选)
 		* _w {int} 当前fields改变后的宽度(可选)
 		*/
-		forceFitColumn : function( fields,_w ){//平均设置列宽大小，如果传入field则传入的filed 大小不会改变
+		_forceFitColumn : function( fields,_w ){//平均设置列宽大小，如果传入field则传入的filed 大小不会改变
 			var self = this,
 			opt = self.configs;	
 			var columns = opt.columns;
-
+			
 			var fields = typeof fields == 'undefined' ? [] : fields;
 			
 			fields = $.isArray( fields ) ? fields : [ fields ];
 			
-			var scrollbarSize = self.getScrollbarSize();
-			
 			$("#view2-datagrid-body-"+opt.id).css("overflow-x","hidden");
 			
-			var w = $('#view2_'+opt.id).width();//var header = $("#view2-datagrid-header-"+opt.id);var w = header._outerWidth();
-			//var w = header._outerWidth();
-			//检测是否有滚动条
+			var w = $('#view2_'+opt.id).width();
+
 			var body = $("#view2-datagrid-body-"+opt.id);
-			//var sh = body.get(0).scrollHeight;
-			//var sw = body.get(0).scrollWidth;
-			if( self.hasScroll(body,'top') ) {//if( sh > body._outerHeight() ) {
+
+			if( self.hasScroll(body,'top') ) {
+				var scrollbarSize = self.getScrollbarSize();
 				w -= scrollbarSize.width;
-			//} else if( sw > body.outerWidth() ){
-				//w -= scrollbarSize.height;	
 			} else {
 				w -= 0;	
 			}
@@ -2309,11 +2431,9 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			//获取每个列宽
 			$("#view2-datagrid-header-inner-htable-tbody-"+opt.id).find(">.datagrid-header-row td[field]").each(function(){	
 				var tw = $(this)._outerWidth();
-				//console.log( tw,2 );
+
 				var field = $(this).attr('field');
-				//if( !border ) {
-					//border = $(this)._outerWidth() - $(this)._width();	
-				//}
+
 				for( var x=0;x<columns.length;x++ ) {
 					if( columns[x]['field'] == field && self.inArray( field,opt.hideColumns )==-1 ) {
 						if( columns[x]['forceFit'] && self.inArray( field,fields )==-1 ) {
@@ -2321,8 +2441,7 @@ field['callBack'].call(self,t,rowId,field,rowData);
 							_mw[ field ] = columns[x]['minWidth'];
 							_wt += tw;
 						} else {
-							w -= tw;
-						//	console.log(w,tw,1);	
+							w -= tw;	
 						}
 						break;
 					}
@@ -2338,11 +2457,25 @@ field['callBack'].call(self,t,rowId,field,rowData);
 				}
 				self._setFieldWidth(f,_clw[f]);
 			}
-			if( dw && fields.length==1 && _w ) {
-				self._setFieldWidth(fields[0]['field'],_w-dw);	
+			//如果forceFit的列都已经是最小了，那么还超出宽度就需要减少当前列的宽度
+			if( dw && fields.length==1 && _w && opt.forceFitVisible ) {
+				//fields[0]['field']
+				self._setFieldWidth(fields[0],_w-dw);	
 			}
 
-			self.fireEvent("onForceFitColumn",[opt]);
+			//self.fireEvent("onForceFitColumn",[opt]);
+			return self;
+		},
+		forceFitColumn : function(fields,_w){
+			var self = this,
+			opt = self.configs;	
+			if( opt._forceFitWTime ) {
+				clearTimeout( opt._forceFitWTime );	
+			}
+			opt._forceFitWTime = setTimeout( function(){
+				self._forceFitColumn(fields,_w);	
+				self.fireEvent("onForceFitColumn",[opt]);
+			},0 );
 			return self;
 		},
 		unForceFitColumn : function(){
@@ -2364,11 +2497,63 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			/*递归遍历*/
 			var listMap = function( column,pid ){
 				
+				if( column.field === undef || column.field=='' ) {
+					column.field = ['field',++Nex.aid].join('');	
+				}
+				
 				if( pid === undef || pid === null ) {
 					  pid = null;	
 				} else {
 					pid = $.isPlainObject( pid ) && (pid.field !== undef) ? pid.field : null;
 				}
+				
+				if( opt.multiFromStr && opt.multiSplitStr != '' ) {
+					//对列名有"_"的进行处理
+					var _sp = opt.multiSplitStr;
+					var _md = opt.multiFromStrData;
+					var _field = column.field+'';
+					column._ofield =  column._ofield===undef ? _field : column._ofield;
+					
+					var sl = column._hasSet?[]:_field.split(_sp);
+					if( sl.length>1 ) {
+						 column._hasSet = true;
+						 column.field = sl[0];
+						 var of = column._ofield.split(_sp);
+						 var index = $.inArray( column.field,of );
+						 column.field = of.slice(0,index+1).join(_sp); 
+						 var tls = column.field.split(_sp);
+						 var _realField = tls.pop();
+						 column.title = column.title||_realField;
+						 if( _realField in _md ) {
+							$.extend( column,_md[ _realField ] ); 
+						 }
+						 if( column.field in _md ) {
+							$.extend( column,_md[ column.field ] ); 
+						 }
+						 sl.splice(0,1);//删除第一个
+						 column.columns = column.columns === undef ? [] : column.columns;
+						 column.columns.push( { field : sl.join(_sp),_ofield:column._ofield } );
+						
+					} else {
+						if( !column._hasSet && sl.length ) {
+							   column._hasSet = true;
+							   var of = column._ofield.split(_sp);
+							   var index = $.inArray( column.field,of );
+							   column.field = of.slice(0,index+1).join(_sp); 
+							   var tls = column.field.split(_sp);
+							   var _realField = tls.pop();
+							   column.title = column.title||_realField;
+							   
+							   if( _realField in _md ) {
+									$.extend( column,_md[ _realField ] ); 
+							   }
+							   if( column.field in _md ) {
+									$.extend( column,_md[ column.field ] ); 
+							   }
+						}
+					}
+				}
+				
 				//设置默认值
 				column = $.extend({},opt._columnMetaData,column);
 				
@@ -2393,7 +2578,8 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			for(;i<len;i++) {
 				listMap( fields[i],null );
 			}	
-			
+			//修正header和body如果columns设置不一致时顺序问题
+			list = self._getLeafColumns();
 			return list;
 		},
 		addColumn : function( column ){
@@ -2424,6 +2610,7 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			}
 			
 			//检测是否设置了 列 否则用data的key作为列名
+			//var _mIndex = {}; //已经做了处理
 			if(xcolumns.length<=0) {
 				if(opt.data.length>0) {
 					
@@ -2433,6 +2620,19 @@ field['callBack'].call(self,t,rowId,field,rowData);
 							xcolumns.push({'field':i});
 						}
 					}
+					//已经做了处理
+					//给每列添加数据映射 因为每列有可能以"_"分割 所以最后一个就是需要的列名
+					/*var _hdata = opt.data[0];
+					if( $.isPlainObject( _hdata ) ) {
+						for(var _index in _hdata) {
+							var _cl = _index.split('_');
+							if( _cl.length>1 ) {
+								_mIndex[ _cl[ _cl.length-1 ] ] = _index;
+							} else {
+								_mIndex[ _index ] = _index;
+							}
+						}
+					}*/
 				}
 			}
 			
@@ -2452,9 +2652,19 @@ field['callBack'].call(self,t,rowId,field,rowData);
 				
 				//if(typeof columns[i]['width'] == 'number') columns[i]['width'] += 'px';
 				columns[i]['field'] = columns[i]['field'] === "" ?  i : columns[i]['field'];
+				//已经做了处理
+				//if( !$.isEmptyObject( _mIndex ) ) {
+					//columns[i]['index'] = _mIndex[ columns[i]['field'] ] === undefined ?  columns[i]['index'] : _mIndex[ columns[i]['field'] ];
+				//}
+				
+				//customColumnData
+				if( columns[i]['field'] in opt.customColumnData ) {
+					$.extend( columns[i],opt.customColumnData[columns[i]['field']] );
+				}
+				
 				columns[i]['title'] = columns[i]['title'] === "" ?  columns[i]['field'] : columns[i]['title'];
 				columns[i]['index'] = columns[i]['index'] === "" ?  columns[i]['field'] : columns[i]['index'];
-				columns[i]['_colid'] = columns[i]['_colid'] === undef ? 'col'+opt._colid++ : columns[i]['_colid'];
+				columns[i]['_colid'] = columns[i]['_colid'] === undef ? 'col'+(Nex.grid._colid++ || opt._colid++) : columns[i]['_colid'];
 				
 				//判断是否开启ck ed字段
 				if( opt.checkBox !== false && columns[i]['field']=="ck" && _hasSetCk===false ) {
@@ -2505,6 +2715,8 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			//opt.columns.length = 0;
 			opt.columns = columns;
 			
+			self.fireEvent( 'onSetColumns',[columns] );
+			
 			return opt.columns;
 		},
 		//页面刷新的时候调用
@@ -2522,14 +2734,12 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			}
 		},
 		displayColumn : function( field , type ) {
-			
 			var self = this,
 				opt = self.configs,
 				_columns = opt.hideColumns,
 				gid = opt.gid;
 			var fields = self.getColumnList();
 
-			
 			if( self.inArray(field,fields) == -1 ) return false;
 			
 			var isDisplay = (type == "show") ? true : false;
@@ -2548,8 +2758,10 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			var eventType = isDisplay ? 'onShowColumn' : 'onHideColumn';
 
 			self.fireEvent(eventType,[field,opt]);
-
+			//是否应该锁定？ onScrll
+			self.lockEvent("onScroll");
 			self.methodInvoke('resetViewSize');
+			self.unLockEvent("onScroll");
 			
 			return true;
 		},
@@ -2558,7 +2770,8 @@ field['callBack'].call(self,t,rowId,field,rowData);
 		*  field {String} 列名
 		*/
 		showColumn : function( field ){
-			var self = this;
+			var self = this,
+				opt = self.configs;
 			var r = self.fireEvent('onBeforeShowColumn',[field,opt]);
 			if( r === false ) {
 				return r;	
@@ -2570,7 +2783,8 @@ field['callBack'].call(self,t,rowId,field,rowData);
 		*  field {String} 列名
 		*/
 		hideColumn : function( field ){
-			var self = this;
+			var self = this,
+				opt = self.configs;
 			var r = self.fireEvent('onBeforeHideColumn',[field,opt]);
 			if( r === false ) {
 				return r;	
@@ -2644,8 +2858,10 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			}
 			
 			tds.bind({
-				click : function(e){
-									  
+				click : function(e){  
+					if( dataGrid.__resizing || dataGrid.__moving ) {
+						return;	
+					}
 					var field = $(this).attr("field");
 					if( opt.autoScrollToField ) {
 						self.scrollToField(field);	
@@ -2714,11 +2930,212 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			self.setGridHeader();
 			if( w ) {
 				self.onInitFieldWidth();
+				self.refreshColumnsWidth();
 			}
 			self.fireEvent("onUpdateHeaderRow",[opt]);
 		},
+		_getColumnChildrens : function( name ){
+			var self = this
+				,undef
+				,opt = self.configs;	
+			var list = [];
+			if( name === undef || name === null ) {
+				return self._getRootColumns();	
+			}
+			var columns = opt._columnsHash;	
+			for( var key in columns ) {
+				var field = columns[key];	
+				if( field.__pid === name ) {
+					list.push( field );
+				}		
+			}		
+			return list;	
+		},
+		_getColumnAllChildrens : function( name ){
+			var self = this
+				,undef
+				,opt = self.configs;	
+			var list = [];
+			var name = name;
+			var _loop = function( n ){
+				var childs = self._getColumnChildrens(n);
+				for( var i=0,len=childs.length;i<len;i++ ) {
+					list.push( childs[i] );	
+					_loop( childs[i]['field'] );
+				}
+			};
+			_loop(name);
+			return list;	
+		},
+		/*获取当前单元格下 还有多少层次*/
+		_getColumnAllLevel : function( name ){
+			var self = this
+				,undef
+				,opt = self.configs;	
+			if( name === undef || name === null || name === '' ) {
+				name = null;
+			}	
+			var columns = opt._columnsHash;	
+			var childs = self._getLeafColumns( name );
+			var level = 1;
+			var getTop = function( n ){
+				var n = 'nsort'+n;
+				if( n in columns ) {
+					var column = columns[n];
+					if( column.__pid !== name ) {
+						level++;
+						return getTop( column.__pid );	
+					} else {
+						return level++;	
+					}	
+				}	
+			};
+			var _max = 0;
+			$.each( childs,function(i,field){
+				var i = getTop( field['field'] );
+				_max = Math.max( _max,i );	
+				level = 1;
+			} );
+			
+			return _max;	
+		},
+		_isRootColumn : function( field ){
+			var field = field || {};
+			return field.__pid === null || 	field.__pid===undef ? true : false;	
+		},
+		_isLeafColumn : function(name){
+			var list = this._getColumnChildrens( name );
+			return list.length ? false : true;
+		},
+		/**
+		*获取指定单元格下的叶子节点	
+		*/
+		_getLeafColumns : function( name ){
+			var self = this
+				,undef
+				,opt = self.configs;
+			var list = [];
+			var columns = opt._columnsHash;	
+			var childs = self._getColumnAllChildrens( name );
+			for( var i=0,len=childs.length;i<len;i++ ) {
+				if( self._isLeafColumn( childs[i]['field'] ) ) {
+					list.push( childs[i] );	
+				}
+			}
+			return list;	
+		},
+		//返回指定单元格的最顶层
+		_getTopColumn : function(name){
+			var self = this
+				,undef
+				,opt = self.configs;
+			var columns = opt._columnsHash;	
+			var name = 'nsort'+name;
+			if( name in columns ) {
+				var column = columns[name];
+				if( column.__pid !== null && column.__pid !== undef ) {
+					return self._getTopColumn( column.__pid );	
+				} else {
+					return column;	
+				}	
+			}	
+		},
+		//返回最顶层的单元格列表
+		_getRootColumns : function(){
+			var self = this
+				,undef
+				,opt = self.configs;
+			var list = [];
+			var columns = opt._columnsHash;
+			for( var key in columns ) {
+				var field = columns[key];	
+				if( field.__pid === null || field.__pid===undef ) {
+					list.push( field );
+				}	
+			}	
+			return list;		
+		},
 		/*
-		*多表头实现
+		*多表头实现 方法一
+		*/
+		view2_header_inner_row_1 : function(){
+			var self = this
+				,undef
+				,opt = self.configs;
+			var hlist = [];
+			var hhash = {};
+			
+			if( !opt.multiColumns ) {
+				return self.tpl('view2_header_inner_row_bak',data);	
+			}	
+			//leafColumn 模版
+			var tdTpl = '<td rowspan="<%=rowSpan%>" colspan="<%=colSpan%>" id="<%=gridId%>_cols_<%=_colid%>" class="datagrid-td-leaf datagrid_<%=_colid%>" field="<%=field%>" align="<%=align%>">'
+							+'<div class="datagrid-header-wrap" field="<%=field%>" >'
+								+'<div id="<%=gridId%>_cell_header_<%=_colid%>" class="datagrid-cell datagrid-header-cell datagrid-cell-<%=_colid%> datagrid-cell-header-<%=_colid%> <%=hcls%>" >'
+									+'<span class="datagrid-header-column-inner datagrid-header-column-inner-text"><%=title%></span>'
+								+'</div>'
+							+'</div>'
+						+'</td>';
+			//parentColumn模版
+			var tdTpl2 = '<td rowspan="<%=rowSpan%>" colspan="<%=colSpan%>" class="datagrid-td-noleaf" align="<%=align%>">'
+							+'<div class="datagrid-header-wrap">'
+								+'<span class="datagrid-header-column-inner datagrid-header-column-inner-text"><%=title%></span>'
+							+'</div>'
+						+'</td>';
+			
+			function getTD( field,level ){
+				var level = level || 0;
+				var name = field['field'];
+				var colSpan = self._getLeafColumns( name );
+				var rowSpan = 1;
+				colSpan = colSpan.length;
+				//rowSpan += 1;
+				rowSpan = maxRow-level;
+				var fieldText = field.title === undef ? field.field : field.title ;
+				field.title = fieldText;
+			
+				if( self._isLeafColumn(name) ) {
+					colSpan = 1;
+					var tds = self.tpl( tdTpl,$.extend({},field,{gridId:opt.id,rowSpan:rowSpan,colSpan:colSpan}) );	
+					trs[level].push( tds );
+					return;
+				} else {
+					rowSpan = 1;
+					var tds = self.tpl( tdTpl2,$.extend({},field,{gridId:opt.id,rowSpan:rowSpan,colSpan:colSpan,align:opt.multiColumnsAlign}) );	
+					trs[level].push( tds );
+					var childs = self._getColumnChildrens( name );
+					$.each( childs,function(i,f){
+						var _level = level;
+						getTD( f,++_level );
+					} );
+				}	
+			}
+			
+			//更新_columnsHash
+			//self._columnsMap();
+			var columns = opt._columnsHash;
+			var maxRow = self._getColumnAllLevel();
+			var cols = self._getRootColumns();
+			var trs = [];//每层td内容
+			//初始化内容
+			for(var i=0;i<maxRow;i++) {
+				trs[i] = [];	
+			}
+			$.each( cols,function(i,field){
+				getTD( field );	
+			} );
+			
+			var html = [];
+			$.each(trs,function(i,tr){
+				var tds = ['<tr class="datagrid-header-row">'];
+				tds.push(tr.join(''));
+				tds.push('</tr>');
+				html.push( tds.join('') );	
+			});
+			return html.join('');
+		},
+		/*
+		*多表头实现 方法二
 		*/
 		view2_header_inner_row : function( data ){ 
 			var self = this
@@ -2730,63 +3147,39 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			if( !opt.multiColumns ) {
 				return self.tpl('view2_header_inner_row_bak',data);	
 			}
-			
+			if( opt.mulitEngine == 1 ) {
+				return self.view2_header_inner_row_1( data );
+			}
 			//更新_columnsHash
 			//self._columnsMap();
 			var columns = opt._columnsHash;
 			/*
 			 *最终单元格模版
 			*/
-			var tdTpl = '<td id="datagrid_cols_<%=_colid%>" class="datagrid_<%=_colid%>" field="<%=field%>" align="<%=align%>">'
+			var tdTpl = '<td id="<%=gridId%>_cols_<%=_colid%>" class="datagrid_<%=_colid%>" field="<%=field%>" align="<%=align%>">'
 							+'<div class="datagrid-header-wrap" field="<%=field%>" >'
-								+'<div id="datagrid_cell_header_<%=_colid%>" class="datagrid-cell datagrid-cell-<%=_colid%> datagrid-cell-header-<%=_colid%> <%=hcls%>" >'
+								+'<div id="<%=gridId%>_cell_header_<%=_colid%>" class="datagrid-cell datagrid-header-cell datagrid-cell-<%=_colid%> datagrid-cell-header-<%=_colid%> <%=hcls%>" >'
 									+'<span><%=title%></span>'
 								+'</div>'
 							+'</div>'
 						+'</td>';
 			var getTopParent = function(name){
-				var name = 'nsort'+name;
-				if( name in columns ) {
-					var column = columns[name];
-					if( column.__pid !== null && column.__pid !== undef ) {
-						return getTopParent( column.__pid );	
-					} else {
-						return column;	
-					}	
-				}	
+				return self._getTopColumn( name );
 			}			
 			var sortColumns = function( columns ){
 				return columns;	
 			}
 			var getRoot = function(){
-				var list = [];
-				for( var key in columns ) {
-					var field = columns[key];	
-					if( field.__pid === null || field.__pid===undef ) {
-						list.push( field );
-					}	
-				}	
-				return list;	
+				return self._getRootColumns();
 			}
 			var getChildrens = function(name){
-				var list = [];
-				if( name === undef || name === null ) {
-					return sortColumns(getRoot());	
-				}
-				for( var key in columns ) {
-					var field = columns[key];	
-					if( field.__pid === name ) {
-						list.push( field );
-					}		
-				}		
-				return sortColumns(list);
+				return self._getColumnChildrens(name);
 			}
 			var isRoot = function(field){
-				return field.__pid === null || 	field.__pid===undef ? true : false;
+				return self._isRootColumn();
 			}
 			var isLeaf = function( name ){
-				var list = getChildrens( name );
-				return list.length ? false : true;
+				return self._isLeafColumn(name);
 			}
 			
 			var getTD = function( field ){
@@ -2794,13 +3187,13 @@ field['callBack'].call(self,t,rowId,field,rowData);
 				var fieldText = field.title === undef ? field.field : field.title ;
 				field.title = fieldText;
 				if( isLeaf( name ) ) {
-					return self.tpl( tdTpl,field );
+					return self.tpl( tdTpl,$.extend({},field,{gridId:opt.id}) );
 				} else {
 					var childs = getChildrens( name );
 					var itd = ['<td class="datagrid-noborder" valign="bottom">'];
 					itd.push('<table cellpadding="0" cellspacing="0" style="height:100%;">');
 						itd.push('<tr class="datagrid-header-middle-row">');
-							itd.push('<td colspan="'+childs.length+'" class="datagrid-td-noborder" align="center">'+fieldText+'</td>');
+							itd.push('<td colspan="'+childs.length+'" class="datagrid-td-noborder" align="'+opt.multiColumnsAlign+'">'+fieldText+'</td>');
 						itd.push('</tr>');
 						itd.push('<tr>');
 							for( var i=0;i<childs.length;i++ ) {
@@ -2884,15 +3277,15 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			$view1_header_outer_wraper.html( view1_header_outer_wraper.join("") );
 			$view2_header_outer_wraper.html( view2_header_outer_wraper.join("") );
 			
-			ltr = $("> tr.datagrid-header-row",'#view1-datagrid-header-inner-htable-tbody-'+opt.id);
-			tr = $("> tr.datagrid-header-row",'#view2-datagrid-header-inner-htable-tbody-'+opt.id);
+			ltr = $(">.datagrid-header-row",'#view1-datagrid-header-inner-htable-tbody-'+opt.id);
+			tr = $(">.datagrid-header-row",'#view2-datagrid-header-inner-htable-tbody-'+opt.id);
 			
 			self.setGridHeaderEvent(tr,ltr);//性能
 			
 			self.methodCall('setGridHeader');
-			
-			self.refreshHeaderHeight(tr,ltr,opt);
-			
+			if( opt.mulitEngine != 1 ) {
+				self.refreshHeaderHeight(tr,ltr,opt);
+			}
 			self.fireEvent('onHeaderCreate',[tr,ltr,opt]);
 			
 			return true;
@@ -2920,6 +3313,7 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			var self = this,
 				opt = self.configs,
 				gid = opt.gid;
+			//headerTpl都不在建议使用了	
 			if( !opt.headerTpl ) return -1;
 			var fields = opt.columns;	
 			var headerBody = $("#view2-datagrid-header-inner-htable-tbody-"+opt.id);
@@ -2998,8 +3392,9 @@ field['callBack'].call(self,t,rowId,field,rowData);
 		* 同setColumnData,不同在于不会触发事件和刷新表格
 		*/
 		setColumnValue : function(field,key,value){
-			var self = this;
-			var fields = self.getColumns();
+			var self = this,
+				opt = this.configs;
+			var fields = opt.columns;;//self.getColumns();
 			var i = 0,
 				len = fields.length;
 			for(;i<len;i++) {
@@ -3013,19 +3408,14 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			var self = this,
 				opt = self.configs,
 				gid = opt.gid;
-			var glist = $(gid).find("td[field='"+cfg.field+"']:first").find("div.datagrid-cell");
 			
-			if(!glist.size()) return;
+			var column = self.getColumnData(cfg.field);
 			
-			var w = parseFloat(glist._width());
+			if( !column ) return;
 			
-			w = w + cfg.offsetX;
-			
-			w += opt.padding;//真实宽度
+			var w = column._fieldWidth + cfg.offsetX;
 			
 			var w = self.setFieldWidth( cfg.field,w );
-			
-			//self.setColumnValue(cfg.field,'width',w);//可省略
 
 			self.fireEvent("onAfterResize",[cfg.field,w,cfg]);
 		},
@@ -3352,7 +3742,7 @@ field['callBack'].call(self,t,rowId,field,rowData);
 				tr.each(function(){
 					var tr = $(this);
 					var rowId = $(this).attr("datagrid-rid");
-					var rowData = self.getRowData(rowId);
+					var rowData = self._getRowData(rowId);//因为这个是一次性过程 必须使用引用的rowData
 					//行回调
 					if( $.isFunction(opt.rowCallBack) && opt.rowCallBack != $.noop ) {
 						opt.rowCallBack.call(self,tr,rowId,rowData);
@@ -3706,17 +4096,19 @@ field['callBack'].call(self,t,rowId,field,rowData);
 				return false;	
 			}
 			
-			var fieldList = self.getColumnList();
+			//var fieldList = self.getColumnList();
 			
 			var editList = [];
 			
 			for(var f in d) {
-				if( self.inArray(f,fieldList)!=-1 ) {
+				//if( self.inArray(f,fieldList)!=-1 ) {
 					var ed = self.setFieldValue(rid,f,d[f]);	
 					if( ed !== false ) {
 						editList.push(f);
 					}
-				}	
+				//} else {
+				//	self.setRowData( rid,f,d[f] )	
+				//}	
 			}
 			//editList:修改过的单元格
 			self.fireEvent("onAfterUpdateRow",[rid,d,editList,opt]);
@@ -4013,12 +4405,18 @@ field['callBack'].call(self,t,rowId,field,rowData);
 				tr.push(tdId);
 				tr.push('" align="');
 				tr.push(d.fields[j]["align"]);
+				tr.push('" valign="');
+				tr.push(d.fields[j]["valign"]);
 				tr.push('">');
 				
 				//tr.push('<div id="'+cellId+'" class="datagrid-cell datagrid-cell-c1-'+field+' '+d.fields[j]["bcls"]+'" style="width:'+d.fields[j]["width"]+';" >'+_expand+'</div></td>');
 				tr.push('<div id="');
 				tr.push(cellId);
-				tr.push('" class="datagrid-cell datagrid-cell-')
+				tr.push('" class="datagrid-cell');
+				if( opt.nowrap ) {
+					tr.push(' datagrid-cell-nowrap ');	
+				}
+				tr.push(' datagrid-cell-');
 				tr.push(_colid);
 				//tr.push(' datagrid-cell-c1-');
 				//tr.push(field);
@@ -4465,7 +4863,7 @@ field['callBack'].call(self,t,rowId,field,rowData);
 				});
 
 				self.lazyLoadRow();
-				self.onViewSizeChange(false);
+				self._setViewSize();
 				self.fireEvent('onScroll',[]);
 		
 				self.hideLoading();
@@ -4481,7 +4879,7 @@ field['callBack'].call(self,t,rowId,field,rowData);
 				var sLeft = opt.sLeft;
 				var sTop = opt.sTop;
 				
-				self.onViewSizeChange(false);
+				self._setViewSize();
 				
 				self.setRow(0,function(){
 					func();	
@@ -4508,15 +4906,15 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			self.fireEvent('onShowGrid',[opt]);
 			self.unLockMethod('resetViewSize');
 
-			self.methodInvoke('resetViewSize');
+			self.methodInvoke('resetViewSize',function(){
+				//是否初始加载
+				self.onFinishDone = self.onFinishDone || false;
+				if(!self.onFinishDone) {
+					self.onFinishDone = true;
+					self.fireEvent('onFinish',[opt]);
+				}										   
+			});
 
-			//是否初始加载
-			self.onFinishDone = self.onFinishDone || false;
-			if(!self.onFinishDone) {
-				self.onFinishDone = true;
-				self.fireEvent('onFinish',[opt]);
-			}
-			
 		},
 		removeEmptyDiv : function(){
 			var self = this;
@@ -4529,6 +4927,11 @@ field['callBack'].call(self,t,rowId,field,rowData);
 				gid = opt.gid;		
 				
 			var w = $("#view2-datagrid-header-inner-htable-"+opt.id)._outerWidth();
+			
+			if( parseInt(w)<=0 ) {
+				w = $("#view2-datagrid-header-"+opt.id)._outerWidth();	
+			}
+			
 			var vbody = $("#view2-datagrid-body-"+opt.id)
 			var h = vbody._height();
 			if( w>vbody._width() ) {
@@ -4662,7 +5065,7 @@ field['callBack'].call(self,t,rowId,field,rowData);
 
 			
 			self.getGridData(function(){
-				self.fireEvent('onGetData',[opt.data,opt]);
+				self.fireEvent('onGetGridData',[opt.data,opt]);//onGetData 修改为onGetGridData
 				successBack.apply(this,arguments);	
 			},function(){
 				errorBack.apply(this,arguments);
@@ -4998,6 +5401,10 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			opt.pageNumber = parseInt( i ) <= 0 ? 1 :  parseInt( i );
 			self.refreshData();
 		},
+		//获取每页数据
+		getPageData : function(){
+				
+		},
 		/*
 		* ajax返回数据过滤函数,可通过参数或者已知函数声明eg : xmlFilter,htmlFilter
 		*/
@@ -5015,6 +5422,13 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			
 			var data = json || {};
 			var s = self._undef(s,false);	
+			
+			if( $.isArray(json) ) {
+				data = {
+					rows : data	
+				};
+			}
+			
 			//data.rows = data.rows || [];
 			/*if( data.footer ) {
 				opt.footerData = data.footer;
@@ -5122,7 +5536,8 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			opt.queryParams.pageSize = opt.pageSize;
 			
 			self.methodCall('getGridData');
-			var _xr = self.fireEvent('onGetGridData',[successBack,errorBack,async]);
+			//onGetGridData
+			var _xr = self.fireEvent('onBeforeGetGridData',[successBack,errorBack,async]);
 			if( _xr === false ) return;
 			
 			if(async) {
@@ -5190,12 +5605,14 @@ field['callBack'].call(self,t,rowId,field,rowData);
 					};
 			var complete = function(data){
 						self.fireEvent('onLoadComplete',[data,opt]);
-					};		
+					};	
+			var _r = beforeSend();
+			if( _r === false ) return;
+			
 			if( $.isFunction( opt.url ) ) {
 				
-				var _r = beforeSend();
-				
-				if( _r === false ) return;
+				/*var _r = beforeSend();
+				if( _r === false ) return;*/
 				
 				var rdata = opt.url.call(self,opt.queryParams,success,error);
 				if( rdata !== undef ) {
@@ -5209,7 +5626,7 @@ field['callBack'].call(self,t,rowId,field,rowData);
 					cache : opt.cache,
 					dataType : opt.dataType,
 					data : opt.queryParams,
-					beforeSend : beforeSend,
+					//beforeSend : beforeSend,
 					success : success,
 					error : error,
 					complete : complete
@@ -5266,6 +5683,9 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			
 			self.methodCall('show');
 			self.fireEvent('onShowContainer',[views]);
+			
+			self.fireEvent('onCreate',[opt]);
+			
 		}
 	});
 	
@@ -5362,6 +5782,9 @@ field['callBack'].call(self,t,rowId,field,rowData);
 		
 		var self = this;
 		function start(e,opt) {
+			
+			dataGrid.__resizing = true;
+			
 			$(document.body).css("cursor", "col-resize");
 			$(document.body).disableSelection();
 			//$(document.body).css("-moz-user-select", "none");
@@ -5370,7 +5793,7 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			opt.gheader.find("div.datagrid-cell").css("cursor", "col-resize");
 			
 			var _f = opt.self.getColumnData(opt.field,'_colid');
-			var rtd = $('#datagrid_cols_'+_f);
+			var rtd = $('#'+opt.id+'_cols_'+_f);
 			
 			var line = $("<div class='datagrid-resize'></div>");
 			var line2 = $("<div class='datagrid-resize'></div>");
@@ -5414,6 +5837,9 @@ field['callBack'].call(self,t,rowId,field,rowData);
 				resize(e,opt);
 			});
 			$(document).bind("mouseup._resize", function(e){
+				setTimeout(function(){
+					dataGrid.__resizing = false;						
+				},0);
 				if( opt.offsetX ) {
 					var r = opt.stop(e,opt);
 					//if(r === false) return;
@@ -5465,7 +5891,7 @@ field['callBack'].call(self,t,rowId,field,rowData);
 					},
 					"click._gresize" : function(e){
 						e.preventDefault();
-						e.stopPropagation();	
+						e.stopPropagation();
 					}
 				});
 				p.append(resize);
@@ -5474,6 +5900,7 @@ field['callBack'].call(self,t,rowId,field,rowData);
 	$.fn.moveColumn = function(opt) {
 		var columns = this;
 		var moving = false;
+		dataGrid.__moving = false;
 		columns.bind("mousedown.move",function(e){
 			var self = this;
 			var _t = setTimeout(function(){
@@ -5538,6 +5965,7 @@ field['callBack'].call(self,t,rowId,field,rowData);
 		});
 		function start(e) {
 			moving = true;
+			dataGrid.__moving = true;
 			opt.moveField = $(this).attr("field");
 			
 			var _r = opt.self.fireEvent("onBeforeColumnMove",[opt.moveField,opt]);
@@ -5568,6 +5996,7 @@ field['callBack'].call(self,t,rowId,field,rowData);
 			});	
 			$(document.body).bind("mouseup.move",function(e){
 				moving = false;
+				dataGrid.__moving = false;
 				_target.remove();
 				line.remove();
 				$(document.body).unbind("mousemove.move mouseup.move");

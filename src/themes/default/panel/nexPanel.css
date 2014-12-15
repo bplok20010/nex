@@ -1,27 +1,31 @@
 .nex-panel {
-overflow: hidden;
-  padding: 5px;
-  font-family: tahoma, arial, verdana, sans-serif;
-  font-size: 12px;
+  overflow: hidden;
+  /*padding: 5px;*/
+  font-size: 9pt;
+  font-family: "Microsoft YaHei",Arial,sans-serif;
+  color: #000;
   display:block;
-  left:0px; 
-  top:0px;
 }
 
 .nex-panel {
-background-color: #E0ECFF;
-  background: -webkit-linear-gradient(top,#EFF5FF 0,#E0ECFF 20%);
-  background: -moz-linear-gradient(top,#EFF5FF 0,#E0ECFF 20%);
-  background: -o-linear-gradient(top,#EFF5FF 0,#E0ECFF 20%);
-  background: linear-gradient(to bottom,#EFF5FF 0,#E0ECFF 20%);
-  background-repeat: repeat-x;
-  filter: progid:DXImageTransform.Microsoft.gradient(startColorstr=#EFF5FF,endColorstr=#E0ECFF,GradientType=0);
+	background-color: #FFF;
 }
+
 .nex-panel-border {
+  border-collapse:separate;/*IE9下如果父元素如td 设置了border-collapse:collapse 那么box-shadow 会无效 ！！*/	
+  box-shadow: 0 1px 3px rgba(0,0,0,.3);
+  -moz-box-shadow: 0 1px 3px rgba(0,0,0,.3);
+  -webkit-box-shadow: 0 1px 3px rgba(0,0,0,.3);
+ 
+}
+.nex-ie6 .nex-panel-border,
+.nex-ie7 .nex-panel-border,
+.nex-ie8 .nex-panel-border {
   border-width: 1px;
   border-style: solid;
-  border-color: #95B8E7;
+  border-color: #EDEDED;	
 }
+
 .nex-panel-absolute {
 position:absolute;
 }
@@ -54,9 +58,9 @@ position: absolute;
 }
 .nex-panel,
 .nex-panel-shadow {
-  -moz-border-radius: 5px 5px 5px 5px;
+  /*-moz-border-radius: 5px 5px 5px 5px;
   -webkit-border-radius: 5px 5px 5px 5px;
-  border-radius: 5px 5px 5px 5px;
+  border-radius: 5px 5px 5px 5px;*/
 }
 .nex-panel-shadow {
   background: #ccc;
@@ -65,49 +69,62 @@ position: absolute;
   box-shadow: 2px 2px 3px #cccccc;
   filter: progid:DXImageTransform.Microsoft.Blur(pixelRadius=2,MakeShadow=false,ShadowOpacity=0.2);
 }
-.nex-panel .nex-panel-header {
-  background: transparent;
-  padding: 0px 0px 6px 0px;
+
+.nex-panel-header {
+  background: #ededed;
+  color: #000;
+  height:28px;
+  position:relative;
+  cursor:default;
+  overflow:hidden;
+}
+.nex-panel-header-title {
+  padding-left:6px;
+  height:28px;
+  line-height:28px;
+  position:relative;
+  white-space: nowrap;
+  word-wrap: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor:default;
 }
 .nex-panel-icon { 
-width:16px; 
-height:16px; 
+width:20px; 
+height:28px;
+line-height:28px;
 overflow:hidden;
-margin-right:2px; 
-display:inline-block; 
-vertical-align:top;
+/*margin-right:2px; */
+display:inline-block;
+vertical-align: top;
 background-position:center;
 background-repeat:no-repeat;
 }
-.nex-panel-header {
-  font-weight: bold;
-  color: #0E2D5F;
-  height: 16px;
-  line-height: 16px;
-  position:relative;
-  cursor:default;
-}
-.nex-panel-header-table {border-collapse: separate; overflow:hidden;}
-.nex-panel-header-table  td { text-align:left;}
 .nex-panel-title-text { 
-overflow:hidden;
 white-space: nowrap;
 word-wrap: normal;
-overflow: hidden;
 text-overflow: ellipsis;
+overflow: hidden;
+display:inline-block;
+height:28px;
+line-height:28px;
 }
 .nex-panel-tools {
+float:right;
+height:20px;
+overflow:hidden;
 position:absolute;
-right:0px;
-top:0px;
+right:4px;
+top:4px;
+z-index:2;
 }
 .nex-panel-tools a {
 display: inline-block;
-width: 16px;
-height: 16px;
-opacity: 0.6;
-filter: alpha(opacity=60);
-margin: 0 0 0 2px;
+width: 20px;
+height: 20px;
+/*opacity: 0.6;
+filter: alpha(opacity=60);*/
+/*margin: 0 0 0 2px;*/
 vertical-align: top;
 text-align:center;
 }
@@ -118,17 +135,14 @@ top:0px;
 margin:0px;
 padding:0px;
 }
-.nex-panel .nex-panel-body {
-  border-width: 1px;
+.nex-panel-body {
+  border-width: 0px;
   border-style: solid;
   position:relative;
-}
-.nex-panel .nex-panel-body {
+
   border-color: #95B8E7;
-}
-.nex-panel .nex-panel-body {
-  background-color: #ffffff;
-  color: #000000;
+
+  
   overflow:hidden;
 }
 
@@ -137,28 +151,23 @@ overflow:auto;
 }
 
 .nex-panel-collapse-icon {
-background: url('images/panel_tools.png') no-repeat -32px 0;
+background: url('images/win_fold.png') center no-repeat;
 }
 .nex-panel-collapse-icon-collapsed {
-background: url('images/panel_tools.png') no-repeat -32px -16px;
+background: url('images/win_unfold.png') center no-repeat;
 }
 .nex-panel-min-icon {
-background: url('images/panel_tools.png') no-repeat 0 0;
+background: url('images/win_min.png') center no-repeat;
 }
 .nex-panel-max-icon {
-background: url('images/panel_tools.png') no-repeat 0 -16px;
+background: url('images/win_max.png') center no-repeat;
 }
 .nex-panel-max-icon-reset {
-background: url('images/panel_tools.png') no-repeat -16px -16px;
+background: url('images/win_restore.png') center no-repeat;
 }
 .nex-panel-close-icon {
-background: url('images/panel_tools.png') no-repeat -16px 0;
+background: url('images/win_close.png') center no-repeat;
 }
 .nex-panel-tools a:hover {
-  opacity: 1;
-  filter: alpha(opacity=100);
-  background-color: #eaf2ff;
-  -moz-border-radius: 3px 3px 3px 3px;
-  -webkit-border-radius: 3px 3px 3px 3px;
-  border-radius: 3px 3px 3px 3px;
+  
 }

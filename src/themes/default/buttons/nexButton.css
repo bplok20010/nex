@@ -1,37 +1,151 @@
-.nex-btn:focus { outline: none; }
-.nex-btn:visited {}
-.nex-btn:hover { _background: none;}
-.nex-btn:active { }
-.nex-btn {
+/*Button*/
+.nex-button:focus { outline: none; }
+.nex-button:visited {}
+.nex-button:hover { _background: none;}
+.nex-button:active { }
+.nex-button {
 display:inline-block;
 vertical-align:top;
-color:#000;
 text-decoration:none; 
-outline: 0 none; 
-font-family: "微软雅黑",Arial, Helvetica, sans-serif;
-font-size:12px;
-_font-size:11px;
-margin:0 0 0 5px;
+outline: 0 none;
 cursor: pointer;
 position:relative;
+white-space: nowrap;
+overflow:hidden;
+
+font-size: 9pt;
+color:#000;
+font-family: "Microsoft YaHei",Arial,sans-serif;
+
+border:1px solid #ceced0;
+padding:1px 4px;
+line-height:normal;
+
+background: #fefefe;
+background: -webkit-linear-gradient(top,#fefefe 0,#f7f7f7 100%);
+background: linear-gradient(to bottom,#fefefe 0,#f7f7f7 100%);
+filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#fefefe',endColorstr='#f7f7f7',GradientType=0);
+
+-webkit-transition-duration: .3s;
+-moz-transition-duration: .3s;
+-ms-transition-duration: .3s;
+-o-transition-duration: .3s;
+transition-duration: .3s;
+-webkit-transition-property: background-color,border-color,color,-webkit-box-shadow,-webkit-transform;
+-moz-transition-property: background-color,border-color,color,-moz-box-shadow,-moz-transform;
+-ms-transition-property: background-color,border-color,color,-ms-box-shadow,-ms-transform;
+-o-transition-property: background-color,border-color,color,-o-box-shadow,-o-transform;
+transition-property: background-color,border-color,color,box-shadow,transform;
 }
-.nex-btn-wraper {
+.nex-button-focus .nex-button-left { /*outline:#00ff00 dotted 1px;*/}
+
+.nex-button-plain {
+	border-width:0px;
+	padding:2px 5px;
+	background: none;
+	filter : none;
+}
+
+.nex-button-focus,
+.nex-button-hover
+{
+	border: 1px solid #b7b7bb;
+	background: #f7f7f7;
+	background: -webkit-linear-gradient(#f8f8f8,#f3f3f3);
+	background: linear-gradient(#f8f8f8,#f3f3f3);
+	filter: progid:DXImageTransform.Microsoft.gradient(startColorstr=#f8f8f8,endColorstr=#f3f3f3);
+}
+.nex-button-toggle,
+.nex-button-pressed,
+.nex-button-active{
+	background: #FDFDFD;
+	background: -webkit-linear-gradient(#F7F7F7,#FEFEFE);
+	background: linear-gradient(#F7F7F7,#FEFEFE);
+	filter: progid:DXImageTransform.Microsoft.gradient(startColorstr=#FFF7F7F7,endColorstr=#FFFEFEFE);
+}
+.nex-button-disabled
+{
+	color: #999;
+	border:1px solid #ceced0;
+	opacity: 0.7;
+	filter: alpha(opacity=70);
+	background:#fefefe;
+	background: -webkit-linear-gradient(top,#fefefe 0,#f7f7f7 100%);
+	background: linear-gradient(to bottom,#fefefe 0,#f7f7f7 100%);
+}
+.nex-button-pressed .nex-button-wraper {
+}
+
+.nex-button-plain.nex-button-hover,
+.nex-button-plain.nex-button-focus,
+.nex-button-plain.nex-button-toggle,
+.nex-button-plain.nex-button-pressed {
+	border-width:1px;
+	padding:1px 4px;
+}
+
+.nex-button-left,.nex-button-right {
+	display:inline-block;/*block*/
+}
+.nex-button-left {
+	padding:0 8px;
+	/*height:22px;*/
+	/*line-height:22px;*/
+	position:relative;
+	line-height:normal;
+	overflow: hidden;
+	text-align: center;
+	vertical-align: top;
+	_vertical-align: top;
+}
+.nex-button-right {
+	position:absolute;
+	height:100%;
+	top:0px;
+	right:0px;
+	width:3px;
+}
+.nex-button-layout-table {
+	height:100%;
+	overflow:hidden;
+	margin:0px; padding:0px;
+}
+.nex-button-layout-table td { margin:0px; padding:0px;}
+.nex-button-wraper {
 position:relative;
-display:inline-block;
-vertical-align:middle;
-padding:0 4px;
-color: #444;
-background: #fafafa;
-background-repeat: no-repeat;
-border: 1px solid #bbb;
-background: -webkit-linear-gradient(top,#ffffff 0,#eeeeee 100%);
-background: -moz-linear-gradient(top,#ffffff 0,#eeeeee 100%);
-background: -o-linear-gradient(top,#ffffff 0,#eeeeee 100%);
-background: linear-gradient(to bottom,#ffffff 0,#eeeeee 100%);
-filter: progid:DXImageTransform.Microsoft.gradient(startColorstr=#ffffff,endColorstr=#eeeeee,GradientType=0);
--moz-border-radius: 3px 3px 3px 3px;
--webkit-border-radius: 3px 3px 3px 3px;
-border-radius:3px;
+padding:0px;
+margin:0px;
+overflow: hidden;
+white-space: nowrap;
+word-wrap: normal;
+text-overflow: ellipsis;
+}
+.nex-button-inner {
+	height:22px; 
+	line-height:22px;
+	margin:0px; 
+	padding:0px;
+	display:inline-block;
+	vertical-align: middle;
+	_vertical-align:top;
+	background-position:center;
+	background-repeat:no-repeat;
+	overflow: hidden;
+	white-space: nowrap;
+	word-wrap: normal;
+	text-overflow: ellipsis;
+}
+.nex-button-icon,
+.nex-button-arrow { 
+	width:20px;
+}
+.nex-button-arrow {
+	width:16px;
+	background-image:url(images/arrow.gif);
+}
+
+.nex-button-inner-block {
+display:block;
 }
 
 .nex-btn-disabled span {
@@ -87,7 +201,7 @@ filter: alpha(opacity=70);
 	vertical-align:middle;
 	background-position:center;
 	background-repeat:no-repeat;
- }
+}
 .nex-btn-icon,
 .nex-btn-arrow { 
 	width:16px;
@@ -121,7 +235,7 @@ margin:0px;
 padding-left: 3px;
 padding-right: 3px;
 }
-/* file */
+/* FileButton */
 .nex-btn-file-input:focus { outline:0;}
 .nex-btn-file .nex-btn-wraper { overflow:hidden;}
 .nex-btn-file .nex-btn-inner{
@@ -134,3 +248,4 @@ filter: progid:DXImageTransform.Microsoft.Alpha(Opacity=0);
 opacity: 0;
 font-size: 100px;
 }
+/* SplitButton */

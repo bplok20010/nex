@@ -10,24 +10,24 @@ email:zere.nobo@gmail.com or QQ邮箱
 
 ;(function($){
 	"use strict";
-	var panel = Nex.extend('panel','html');
-	var baseConf = Nex.html.getDefaults( Nex.html.getOptions() );
-	$.nexPanel = $.extPanel = panel;
+	var panel = Nex.define('Nex.Panel','Nex.Html').setXType('panel');
 	panel.extend({
 		version : '1.0',
 		_Tpl : {				
 		}
 	});
-	panel.setOptions(function(){
+	panel.setOptions(function( opt,t ){
 		return {
 			prefix : 'nexpanel-',
-			autoRecovery : false,
+			autoDestroy : true,
 			autoResize : true,
+			_hasBodyView : true,
+			_checkScrollBar : false,
 			position : 'relative',
 			border : true,
-			borderCls : [baseConf.borderCls,'nex-panel-border'].join(' '),
-			containerCls : [baseConf.containerCls,'nex-panel'].join(' '),
-			autoScrollCls : [baseConf.autoScrollCls,'nex-panel-auto-scroll'].join(' '),
+			borderCls : [opt.borderCls,'nex-panel-border'].join(' '),
+			containerCls : [opt.containerCls,'nex-panel'].join(' '),
+			autoScrollCls : [opt.autoScrollCls,'nex-panel-auto-scroll'].join(' '),
 			autoScroll : false,
 			autoShow : true,
 			closeToRremove : true,//关闭窗口后 销毁对象
@@ -51,7 +51,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 			minable : false,
 			maxable : false,
 			hideHeader : false,
-			headerSelectionable : false,
+			headerSelectionable : true,
 			closeable : false,
 			headerItemsCls : '',
 			footerItemsCls : '',
@@ -78,6 +78,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 			iconTag : 'span',
 			modalCls : '',
 			bodyCls : '',
+			bodyStyle : {},
 			autoSize : false,
 			width : 'auto',
 			height : 'auto',
@@ -101,8 +102,8 @@ email:zere.nobo@gmail.com or QQ邮箱
 					return 0;	
 				}
 			},
-			minHeight : 100,
-			minWidth : 200,
+			minHeight : 0,
+			minWidth : 0,
 			events : {
 				onStart : $.noop,
 				onCreate : $.noop,
@@ -127,7 +128,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 			var self = this;
 			var opt = self.configs;
 			
-			Nex.html.fn._sysEvents.apply(self,arguments);
+			Nex.Html.fn._sysEvents.apply(self,arguments);
 			
 			self.bind("onHeaderCreate",self._drag,self);
 			self.bind("onCreate",self._resizeable,self);
@@ -191,16 +192,16 @@ email:zere.nobo@gmail.com or QQ邮箱
 					var r = self.fireEvent("onPanelBeforeDrag",[e,_opt]);	
 					if( r === false) return r;
 				},
-				onStartDrag : function(left,top,e,_opt){
-					var r = self.fireEvent("onPanelStartDrag",[left,top,e,_opt]);	
+				onStartDrag : function(e,_opt){
+					var r = self.fireEvent("onPanelStartDrag",[e,_opt]);	
 					if( r === false) return r;
 				},
-				onDrag : function(left,top,e,_opt){
-					var r = self.fireEvent("onPanelDrag",[left,top,e,_opt]);	
+				onDrag : function(e,_opt){
+					var r = self.fireEvent("onPanelDrag",[e,_opt]);	
 					if( r === false) return r;
 				},
-				onStopDrag : function(left,top,e,_opt){
-					var r = self.fireEvent("onPanelStopDrag",[left,top,e,_opt]);	
+				onStopDrag : function(e,_opt){
+					var r = self.fireEvent("onPanelStopDrag",[e,_opt]);	
 					if( r === false) return r;
 				}
 			});
@@ -261,14 +262,14 @@ email:zere.nobo@gmail.com or QQ邮箱
 			
 			opt.containerCls += ' nex-panel-'+opt.position;
 			
-			Nex.html.fn.setContainer.call(self);
+			Nex.Html.fn.setContainer.call(self);
 			
 			self.unLockEvent('onContainerCreate');
 			/*var container = $('<div class="nex-panel '+( opt.autoScroll ? 'nex-panel-auto-scroll' : '' )+' nex-panel-'+opt.position+' '+opt.cls+'" id="'+opt.id+'"></div>');
 			opt.views['container'] = container;*/
 			var container = opt.views['container'];
 			
-			container._removeStyle('padding');
+			//container._removeStyle('padding');
 			
 			//container.css('z-index',opt.zIndex);
 			render.append(container);
@@ -283,7 +284,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 			if( opt.modal && ('modal' in opt.views) ) {
 				modal = opt.views['modal'];
 			}	
-			
+			//animateHide
 			container.hide();
 			
 			if( modal ) {
@@ -303,7 +304,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 			if( opt.modal && ('modal' in opt.views) ) {
 				modal = opt.views['modal'];
 			}
-			
+			//animateShow
 			if( opt.showAt.at ) {
 				opt.showAt.el = opt.showAt.at;
 			}
@@ -615,7 +616,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 				icon = '<'+opt.iconTag+' '+ititle+' class="nex-panel-icon '+opt.iconCls+'" style="'+_icon+'"></'+opt.iconTag+'>';	
 			}
 			
-			var header = $('<div class="nex-panel-header '+opt.headerCls+'" id="'+opt.id+'_header" style=""><table class="nex-panel-header-table" cellpadding="0" cellspacing="0" border="0"><tr><td>'+icon+'</td><td><span class="nex-panel-title-text"></span></td></tr></table><div class="nex-panel-tools"></div></div>');
+			var header = $('<div class="nex-panel-header '+opt.headerCls+'" id="'+opt.id+'_header" style=""><div class="nex-panel-tools"></div><div class="nex-panel-header-title">'+icon+'<span class="nex-panel-title-text"></span></div></div>');
 			opt.views['header'] = header;
 			container.prepend(header);
 			if( !opt.headerSelectionable ) {
@@ -699,6 +700,37 @@ email:zere.nobo@gmail.com or QQ邮箱
 			self.addComponent( headerItem,headerItems );
 			return self;
 		},
+		bindBodyEvents : function(){
+			var self = this;
+			var opt = self.configs;	
+			var bd = opt.views['body'];
+			var callBack = function(type,e){
+				var r = self.fireEvent(type,[ this,e,opt ]);
+				if( r === false ) {
+					e.stopPropagation();
+					e.preventDefault();
+				}
+			};
+			bd.unbind('.panel');
+			var events = {
+				'scroll.panel' : function(e){
+					callBack.call(this,'onScroll',e);
+					var $this = $(this);
+					if( $this.scrollTop()<=0 ) {
+						self.fireEvent('onScrollTopStart',[ this,e,opt ]);		
+					} else if( $this.scrollLeft()<=0 ) {
+						self.fireEvent('onScrollLeftStart',[ this,e,opt ])
+					}
+					if( self.isScrollEnd( this,'top' ) ) {
+						self.fireEvent('onScrollTopEnd',[ this,e,opt ]);	
+					}
+					if( self.isScrollEnd( this,'left' ) ) {
+						self.fireEvent('onScrollLeftEnd',[ this,e,opt ]);	
+					}
+				}
+			};
+			bd.bind(events);
+		},
 		setBody : function(){
 			var self = this;
 			var opt = self.configs;	
@@ -706,13 +738,14 @@ email:zere.nobo@gmail.com or QQ邮箱
 			var bd = $( '<div class="nex-panel-body '+opt.bodyCls+'" id="'+opt.id+'_body" style=""></div>' );
 			opt.views['body'] = bd;
 			container.append(bd);
-			bd.css('padding',opt.padding);
-			bd.css(opt.style);
+			//bd.css('padding',opt.padding);
+			bd.css(opt.bodyStyle);
+			self.bindBodyEvents();	 
 			self.fireEvent("onBodyCreate",[bd],opt);
 			return self;
 		},
 		setFooter : function(){
-			var self = this;
+			var self = this,undef;
 			var opt = self.C();	
 			var container = opt.views['container'];
 			
@@ -751,47 +784,45 @@ email:zere.nobo@gmail.com or QQ邮箱
 
 			modal.bind({
 				'click' : function(e){
-					self.fireEvent('onModalClick',[modal,opt]);
+					self.fireEvent('onModalClick',[modal,e,opt]);
 					$(document).trigger('click',[e]);
 					return false;
 				},
 				'dblclick' : function(e){
-					self.fireEvent('onModalDblClick',[modal,opt]);
+					self.fireEvent('onModalDblClick',[modal,e,opt]);
 					$(document).trigger('dblclick',[e]);
 					return false;
 				},
 				'mousedown' : function(e){
-					self.fireEvent('onModalMouseDown',[modal,opt]);
+					self.fireEvent('onModalMouseDown',[modal,e,opt]);
 					$(document).trigger('mousedown',[e]);
 					return false;	
 				},
 				'mouseup' : function(e){
-					self.fireEvent('onModalMouseUp',[modal,opt]);
+					self.fireEvent('onModalMouseUp',[modal,e,opt]);
 					$(document).trigger('mouseup',[e]);
 					return false;	
 				},
 				'keydown' : function(e){
-					self.fireEvent('onModalKeyDown',[modal,opt]);
+					self.fireEvent('onModalKeyDown',[modal,e,opt]);
 					$(document).trigger('keydown',[e]);
 					return false;		
 				},
 				'keyup' : function(e){
-					self.fireEvent('onModalKeyUp',[modal,opt]);
+					self.fireEvent('onModalKeyUp',[modal,e,opt]);
 					$(document).trigger('keyup',[e]);
 					return false;		
 				},
 				'mousewheel' : function(e){
-					self.fireEvent('onModalMouseWheel',[modal,opt]);
-					$(document).trigger('mousewheel',[e]);
-					return false;		
+					self.fireEvent('onModalMouseWheel',[modal,e,opt]);	
 				},
 				'mouseover' : function(e){
-					self.fireEvent('onModalMouseOver',[modal,opt]);
+					self.fireEvent('onModalMouseOver',[modal,e,opt]);
 					$(document).trigger('mouseover',[e]);
 					return false;		
 				},
 				'mouseout' : function(e){
-					self.fireEvent('onModalMouseOut',[modal,opt]);
+					self.fireEvent('onModalMouseOut',[modal,e,opt]);
 					$(document).trigger('mouseout',[e]);
 					return false;		
 				}
@@ -835,6 +866,27 @@ email:zere.nobo@gmail.com or QQ邮箱
 					}
 			}
 		},
+		getHeader : function(){
+			var self = this,
+				opt = self.configs;
+			return opt.views['header'];	
+		},
+		getHeaderItem : function(){
+			var self = this,
+				opt = self.configs;
+			return opt.views['headerItem'];	
+		},
+		getBody : function(){
+			var self = this,
+				opt = self.configs;
+			return opt.views['body'];
+		},
+		getFooter : function(){
+			var self = this,
+				opt = self.configs;
+			return opt.views['footer'];	
+		},
+		/*
 		onViewSizeChange : function(func){
 			var self = this;
 			var opt = self.C();	
@@ -843,6 +895,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 			self.resetModelSize();		
 			Nex.html.fn.onViewSizeChange.apply(self,arguments);
 		},
+		*/
 		/*onSizeChange : function(w,h){
 			var self = this,
 				opt=this.configs,
@@ -863,19 +916,36 @@ email:zere.nobo@gmail.com or QQ邮箱
 
 			var render = $(opt.renderTo);
 			
+			var  isWin = $.isWindow( opt.renderTo );
+			
 			var modal = opt.views['modal'];
 			
-			modal._outerWidth( render._outerWidth() );
-			modal._outerHeight( render._outerHeight() );
+			var w = isWin ? 0 : parseInt(render.css('paddingLeft')) + parseInt(render.css('paddingRight'));
+			var h = isWin ? 0 : parseInt(render.css('paddingTop')) + parseInt(render.css('paddingBottom'));
+			
+			var mw = render._width() + w,
+				mh = render._height() + h;
+			
+			if( isWin ) {
+				var winWidth = $(window).width();
+				var winHeight = $(window).height();
+				w = parseInt($(document.body).css('paddingLeft')) + parseInt($(document.body).css('paddingRight'));
+				h = parseInt($(document.body).css('paddingTop')) + parseInt($(document.body).css('paddingBottom'));
+				mw = Math.max( winWidth,$(document.body).width() + w );
+				mh = Math.max( winHeight,$(document.body).height() + h );
+			}
+			
+			modal._outerWidth( mw );
+			modal._outerHeight( mh );
 			
 			self.fireEvent('onModelSizeChange',[ opt ]);
 		},
-		resetViewSize : function(){
+		_setViewSize : function(){
 			var self = this,
 				opt=this.configs,
 				undef;
-			var container = opt.views['container'];	
-			var bd = opt.views['body'];
+			var container = self.getContainer();	
+			var bd = self.getBody();
 			
 			if( opt.realWidth !== 'auto' ) {
 				bd._outerWidth( container._width() );
@@ -888,8 +958,10 @@ email:zere.nobo@gmail.com or QQ邮箱
 				} );
 				bd._outerHeight( container._height()-h );
 			}
+			self.fireEvent("onSetViewSize",[opt]);
 			
-			self.fireEvent('onViewSizeChange',[ opt ]);
+			self.resetModelSize();
+			//self.fireEvent('onViewSizeChange',[ opt ]);
 		},
 		initWH : function(w,h){
 			var self = this,
@@ -924,45 +996,22 @@ email:zere.nobo@gmail.com or QQ邮箱
 		*清空panel内容
 		*/
 		empytContent : function(){
-			var self = this;
-			var opt = self.C();		
-			$('#'+opt.id+'_body').empty();
-			if( opt.autoSize ) {
-				self.autoSize();	
-			}
+			return this.empty();
+		},
+		_addContent : function(items,after){
+			return this._insert( items,after );
 		},
 		/*
 		*向panel追加内容
 		*/
-		addContent : function(items){
-			var self = this,undef;
-			var opt = self.C();
-			if( items === undef ) return;
-			var tbody = $('#'+opt.id+'_body');
-			if( tbody.length ) {
-				self.addComponent( tbody,items );	
-				if( opt.autoSize ) {
-					self.autoSize();	
-				}
-			}
-		},
-		_appendContent : function(){
-			var self = this;
-			var opt = self.C();	
-			var lbody = opt.views['body'];
-			//因为创建后立马写入内容，宽高都没设置，放到回调里
-			var items = opt['html'];
-			self.addComponent( lbody,items );
-			var items = opt['items'];
-			self.addComponent( lbody,items );
-			return lbody;
+		addContent : function(items,after){
+			return this.insert( items,after );
 		},
 		initPanel : function(){
 			var self = this,
 				opt=this.configs;
 				
-			Nex.html.fn.initComponent.apply(self,arguments);
-			
+			Nex.Html.fn.initComponent.apply(self,arguments);
 
 			var container = opt.views['container'];
 			container.hide();

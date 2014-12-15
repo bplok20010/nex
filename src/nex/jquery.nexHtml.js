@@ -1,29 +1,28 @@
 /*
-xtype html
-继承用
+Nex.html组件说明：
+组件名称       : Nex.Html 可通过 new Nex.Html() 或者 Nex.Create('Nex.Html') 来创建
+组件别名xtype  : html  可通过Nex.Create('html')
+加载名称       : Nex.Html 组件存放目录结构 {{nex目录}}/Html.js
 */
 ;(function($){
 	"use strict";
-	var html = Nex.widget('html');
-	$.nexHtml = $.extHtml = html;
+	var html = Nex.define('Nex.Html').setXType('html');
+	//兼容以前版本
+	Nex.html = html;
 	html.extend({
 		version : '1.0',
 		getDefaults : function(opt){
 			var _opt = {
 				prefix : 'nexhtml-',
 				tag : 'div',
+				autoDestroy : true,
 				autoScroll : false,
 				autoResize : true,
 				selectionable : true,
+				_checkScrollBar : false,//检查是否出现滚动条 如果出现会触发onViewSizeChange
+				_hasBodyView : false,//是否有view部分 html 没有这部分 应该关闭 提高效率
 				tabIndex : -1,
 				renderTo : document.body,
-				//isIE : !!window.ActiveXObject,
-				url : '',//支持远程创建 返回数据格式  json
-				cache : true,
-				dataType : 'json',
-				queryParams : {},
-				method : 'get',
-				parames : {},
 				cls : '',
 				overCls : '',
 				cssText : '',
@@ -41,10 +40,13 @@ xtype html
 				attrs : {},
 				html : '',
 				items : [],
-				denyEvents : false,
+				loadMsg : 'Loading...',
+				_lmt : 0,
+				denyEvents : false,//禁止绑定事件 或者指定那些事件不需要绑定 eg [ 'click',dblclick,scroll ]
 				events : {
 					onStart : $.noop,
 					onCreate : $.noop,
+					onInitComponent : $.noop,
 					onSetContainerSize : $.noop,
 					onSizeChange : $.noop,
 					onSetContainerEvent : $.noop
@@ -89,6 +91,7 @@ xtype html
 			});
 			self.bind("onMouseEnter",self._setOverCls,self);
 			self.bind("onMouseLeave",self._unsetOverCls,self);
+			self.bind("onInitComponent",self._setPadding,self);
 			return self;
 		},
 		/*如果width height 设置的是百分比那么将返回百分比值，只对resize和初始创建时有效*/
@@ -96,7 +99,7 @@ xtype html
 			var self = this;
 			var opt = self.C();	
 			var views = opt.views;
-			var container = views['container'];
+			var container = self.getContainer();
 			var renderTo = $(opt.renderTo);
 			var width =  renderTo._width();
 			var height =  renderTo._height();
@@ -185,7 +188,7 @@ xtype html
 				undef,
 				opt = self.configs,	
 				//render = $(opt.renderTo),
-				container = opt.views['container']
+				container = self.getContainer()
 				;
 			
 			opt.width = w === undef ? opt.width : w;	
@@ -199,6 +202,12 @@ xtype html
 			//判断宽高大小是否有变更
 			if( !size.isChange ) {
 				return false;	
+			}
+			//缓存
+			if( opt._containerWidth && opt._containerHeight ) {
+				if( opt._containerWidth === wh.width && opt._containerHeight === wh.height ) {
+					return false;	
+				}	
 			}
 			
 			opt._width = wh.width;
@@ -229,73 +238,263 @@ xtype html
 			} else {
 				container._removeStyle('height',true);
 			}
+			//缓存
+			opt._containerWidth = wh.width;
+			opt._containerHeight = wh.height;
 			
 			return true;
 		},
-		onSizeChange : function(w,h){
+		/*
+		*判断当前是否自适应高度
+		*/
+		isAutoHeight : function(){
+			var self = this,
+				opt = this.configs;
+			return 	opt.realHeight === 'auto' ? true : false;
+		},
+		/*
+		*判断当前是否自适应宽度
+		*/
+		isAutoWidth : function(){
+			var self = this,
+				opt = this.configs;
+			return 	opt.realWidth === 'auto' ? true : false;
+		},
+		/*
+		*设置容器大小  @w 宽度 @h 高度 如果传的是func 则作为回调 并且只作为刷新用 @m如果为false 则触发onResize让子组件改变大小
+		*/
+		resetHtmlSize : function(w,h,m){
 			var self = this,
 				undef,
+				container = self.getContainer(),
 				opt = self.configs,
-				container = opt.views['container'];	
+				m = m === undef ? true : m;	
+			//var w = self._undef(w,opt.width);
+			//var h = self._undef(h,opt.height);
+			var func = false;
+			if( $.isFunction(w) ) {
+				func = w;
+				h = w = undef;
+			}
 			
+			//如果不需要设置会返回false
 			var r = self.setContainerSize(w,h);
 			
 			if( r ) {
-				
-				self.onViewSizeChange(function(){
-					self.fireEvent('onSizeChange',[container,opt]);
-					if( Nex.Manager ) {
-						setTimeout(function(){
+				self.methodInvoke('resetViewSize',function(){
+					self.fireEvent("onSizeChange",[container,opt]);	
+					if( func ) {
+						func.call( self );
+					}
+					if( Nex.Manager && !opt._isInit && m ) {
+						if( opt.__onresize ) {
+							clearTimeout( opt.__onresize );	
+						}
+						opt.__onresize = setTimeout(function(){
 							Nex.Manager.fireEvent("onResize",[opt.id]);		
 						},0);
 					}	
-				});
-				
+				});	
 			}
 			
+			return r;
+		},
+		setHtmlSize : function(w,h){
+			return this.resetHtmlSize(w,h);
+		},
+		//兼容以前的代码
+		onSizeChange : function(w,h){
+			return this.resetHtmlSize(w,h);	
+		},
+		/*
+		* 更新html视图既Body部分宽高 由于Html和container和body是一样的 所有不做处理
+		*  触发onViewSizeChange事件
+		*/
+		resetViewSize : function( func ){
+			var self = this,
+				opt = self.configs;	
+			var r = self.onViewSizeChange();
+			if( r ) {
+				var vbody = self.getBody();
+				self.fireEvent("onViewSizeChange",[opt]);
+			}
+			
+			if( func && $.isFunction(func) ) {
+				func.call( self );
+			}
+			return self;
+		},
+		//设置body大小 
+		_setViewSize : function(){
+			var self = this,
+				opt = self.configs;
+			self.fireEvent("onSetViewSize",[opt]);	
 		},
 		onViewSizeChange : function(func){
 			var self = this,
 				undef,
-				opt = self.configs;
-			if( $.isFunction(func) && !opt._isInit ) {	
-				func.call(self);	
+				opt = self.configs,
+				vbody = self.getBody();
+				
+			self.methodInvoke('_setViewSize');		
+			
+			if( !opt._hasBodyView ) {
+				return false;	
 			}
+				
+			//事件检查滚动条 滚动条出现也会触发viewSize事件
+			if( opt._checkScrollBar ) {
+				//缓存机制
+				//因为grid特殊 所以应该判断是否出现滚动条
+				var hasScrollLeft = self.hasScroll( vbody,'left' );
+				var hasScrollTop = self.hasScroll( vbody,'top' );
+				var barSize = self.getScrollbarSize();
+				
+				var _vbodyWidth = vbody._width() - ( hasScrollTop ? barSize.y : 0 );
+				var _vbodyHeight = vbody._height() - ( hasScrollLeft ? barSize.x : 0 );
+			} else {
+				var _vbodyWidth = vbody._width();
+				var _vbodyHeight = vbody._height();
+			}
+			
+			if( opt._vbodyWidth && opt._vbodyHeight ) {
+				if( (opt._vbodyWidth == _vbodyWidth) && (opt._vbodyHeight == _vbodyHeight) ) {
+					return false;
+				}
+			} 
+				
+			//设置缓存
+			opt._vbodyWidth = _vbodyWidth;
+			opt._vbodyHeight = _vbodyHeight;
+			
+			return true;
 		},
-		setWH : function(w,h){
+		showLoading : function(msg,render){
 			var self = this,
 				opt = self.configs;
-			self.onSizeChange(w,h);
+			var msg = self._undef( msg,opt.loadMsg );//typeof msg === 'undefined' ? opt.loadMsg : msg;
+			var render = self._undef( render,self.getBody() );
+			
+			if( opt._lmt ) {
+				clearTimeout(opt._lmt);	
+			}
+			/*var isExists = $("#"+opt.id+"-laoding-mask-wraper");
+			if( isExists.length ) {
+				var maskMsg = $("#"+opt.id+"-laoding-mask-msg");
+				maskMsg.html( msg );
+				isExists.show();	
+				var w = maskMsg.outerWidth();
+				maskMsg.css("marginLeft",-w/2+"px");
+				return self;
+			}*/
+			var maskWraper = $('<div id="'+opt.id+'-laoding-mask-wraper" class="nex-loading-mask-wraper"><div id="'+opt.id+'-mask" class="nex-loading-mask"></div><div id="'+opt.id+'-laoding-mask-msg" class="nex-loading-mask-msg">'+msg+'</div><div>');
+			$(render).append(maskWraper);
+			if( opt.realWidth == 'auto' && Nex.isIE6 ) {
+				maskWraper._outerHeight( maskWraper.outerHeight() );
+			}
+			var maskMsg = $("#"+opt.id+"-laoding-mask-msg");
+			var w = maskMsg.outerWidth();
+			maskMsg.css("marginLeft",-w/2+"px");
+			maskWraper.click(function(e){
+				e.stopPropagation();
+				e.preventDefault();											 
+			});
+			return self;
+		},
+		/*
+		*有可能只有IE6才会用到
+		*/
+		resizeLoadMask : function(){
+			var self = this,
+				opt = self.configs;	
+			var maskWraper = $("#"+opt.id+"-laoding-mask-wraper");	
+			if( opt.realWidth == 'auto' && Nex.isIE6 ) {
+				maskWraper._outerHeight( maskWraper.outerHeight() );
+			}
+		},
+		hideLoading : function(render){
+			var self = this,
+				opt = self.configs;
+			opt._lmt = setTimeout(function(){
+				$("#"+opt.id+"-laoding-mask-wraper").remove();					
+			},0);
+			return self;
+		},
+		getContainer : function(){
+			var self = this,
+				opt = self.configs;
+			return opt.views['container'];	
+		},
+		getBody : function(){
+			var self = this,
+				opt = self.configs;
+			return opt.views['container'];
+		},
+		setWH : function(w,h,m){
+			var self = this,
+				opt = self.configs;
+			self.resetHtmlSize(w,h,m);
 			return true;
+		},
+		setWidth : function( w ){
+			this.resetHtmlSize(w);	
+			return this;
+		},
+		setHeight : function( h ){
+			var undef;
+			this.resetHtmlSize(undef,h);	
+			return this;
+		},
+		getWidth : function(){
+			//最好用 this.C('_width')
+			return this.getDom().outerWidth() || 0;	
+		},
+		getHeight : function(){
+			//最好用 this.C('_height')
+			return this.getDom().outerHeight() || 0;	
+		},
+		setSize : function( o,s ){
+			if( $.isPlainObject( o ) ) {
+				this.setWH( o.width,o.height );	
+			} else {
+				this.setWH( o,s );		
+			}
+			return this;
+		},
+		getSize : function(){
+			return {
+				width : this.getWidth(),
+				height : this.getHeight()
+			};
 		},
 		autoSize : function(){
 			this.setWH('auto','auto');	
 		},
-		//m : true 强制刷新
+		//m : true 默认改变子组件的大小
 		resize : function(m){
 			var self = this,
 				opt = self.configs,
 				undef;
 			
-			opt._rt = opt._rt || 0;
+			self.__rt = self.__rt || 0;
 			
-			if( opt._rt ) {
-				clearTimeout( opt._rt );	
+			if( self.__rt ) {
+				clearTimeout( self.__rt );	
 			}
 			
-			opt._rt = setTimeout(function(){
+			self.__rt = setTimeout(function(){
 				opt._isResize = true;
-				self.setWH();
+				self.setWH(undef,undef,m);
 				opt._isResize = false;
 			},0);
 		},
 		setContainerEvent : function(){
 			var self = this;
 			var opt = self.C();
-			var container = opt.views['container'];
+			var container = self.getContainer();
 			
 			//事件绑定
-			if( opt.denyEvents ) {
+			if( opt.denyEvents === true ) {
 				return false;
 			} else if( $.isFunction(opt.denyEvents) ) {
 				opt.denyEvents.call(self);	
@@ -310,6 +509,12 @@ xtype html
 				}
 			};
 			var events = {
+				'focusin' : function(e) {
+					callBack.call(this,'onFocusin',e);
+				},
+				'focusout' : function(e) {
+					callBack.call(this,'onFocusout',e);
+				},
 				'focus' : function(e) {
 					callBack.call(this,'onFocus',e);
 				},
@@ -323,7 +528,19 @@ xtype html
 					callBack.call(this,'onDblClick',e);
 				},
 				'scroll' : function(e){
-					callBack.call(this,'onScroll',e);	
+					callBack.call(this,'onScroll',e);
+					var $this = $(this);
+					if( $this.scrollTop()<=0 ) {
+						self.fireEvent('onScrollTopStart',[ this,e,opt ]);		
+					} else if( $this.scrollLeft()<=0 ) {
+						self.fireEvent('onScrollLeftStart',[ this,e,opt ])
+					}
+					if( self.isScrollEnd( this,'top' ) ) {
+						self.fireEvent('onScrollTopEnd',[ this,e,opt ]);	
+					}
+					if( self.isScrollEnd( this,'left' ) ) {
+						self.fireEvent('onScrollLeftEnd',[ this,e,opt ]);	
+					}
 				},
 				'keydown' : function(e) {
 					callBack.call(this,'onKeyDown',e);
@@ -359,6 +576,13 @@ xtype html
 					callBack.call(this,'onContextMenu',e);
 				}
 			};
+			
+			if( $.isArray( opt.denyEvents ) ) {
+				$.each( opt.denyEvents,function(i,e){
+					delete events[e];
+				} );	
+			}
+			
 			container.bind(events);
 			self.fireEvent("onSetContainerEvent",[container,opt]);
 			return true;
@@ -366,7 +590,7 @@ xtype html
 		_disableSelection : function(){
 			var self = this;
 			var opt = self.C();	
-			var container = opt.views['container'];	
+			var container = self.getContainer();	
 			container.disableSelection();	
 		},
 		setContainer : function(){
@@ -376,10 +600,12 @@ xtype html
 			var container = $('<'+opt.tag+' class="'+opt.containerCls+' '+( opt.autoScroll ? opt.autoScrollCls : '' )+' '+( opt.border ? opt.borderCls : '' )+' '+opt.cls+' '+ opt['class'] +'" id="'+opt.id+'"></'+opt.tag+'>');
 			render.append(container);
 			opt.views['container'] = container;
+			//方便使用
+			self.el = container;
 			
 			container[0].style.cssText = opt.cssText;
 			
-			container.css('padding',opt.padding);
+			//container.css('padding',opt.padding);
 			
 			if( opt.tabIndex !== false ) {
 				//设置tabIndex=-1 
@@ -389,6 +615,7 @@ xtype html
 			}
 			container.attr( opt.attrs )
 				     .css( opt.style );
+			container.data('_nexInstance_',self);
 					 
 			self.setContainerEvent();	 
 			
@@ -406,40 +633,126 @@ xtype html
 			var minHeight = self._getMinHeight();
 			var maxHeight = self._getMaxHeight();
 			var maxWidth = self._getMaxWidth();	
-			
-			if( !minWidth && !minHeight && !maxHeight && !maxWidth ) {
-				return self;	
-			}
+			//如果都没有设置 最大 最小 宽度和高度 那么就不用调用onSizeChange 容器不会去设置宽度和高度
+			//发现一个BUG创建时如果min max都没设置 但是由于height是auto 导致出现了滚动条 所以需要再次确实的resize
+			/*if( !minWidth && !minHeight && !maxHeight && !maxWidth ) {
+				return false;	
+			}*/
 			
 			if( opt.width === 'auto' || opt.height==='auto' ) {
-				self.onSizeChange();
+				var r = self.resetHtmlSize();
+				if( r ) {
+					return true;	
+				}
 			}
 			
-			return self;
+			return false;
 		},
-		initComponent : function(){
+		initComponent : function(func){
 			var self = this;
 			var opt = self.configs;	
-			self.onSizeChange();
+			self.fireEvent('onInitComponent',[opt]);
+			//初始是不应该触发onSizeChange事件
+			self.lockEvent('onSizeChange');
+			self.resetHtmlSize();
 			self._appendContent();
 			self._autoSize();
+			self.unLockEvent('onSizeChange');
+			if( $.isFunction( func ) ) {
+				func.call(self);	
+			}
 			self.fireEvent('onCreate',[opt]);
 			opt._isInit = false;
 		},
 		_appendContent : function(){
 			var self = this;
 			var opt = self.C();	
-			var lbody = opt.views['container'];
+			var lbody = self.getBody();
 			var items = opt['html'];
 			self.addComponent( lbody,items );
 			var items = opt['items'];
 			self.addComponent( lbody,items );
 			return lbody;
 		},
+		_add : function( item , after ){
+			return this._insert.apply(this,arguments );	
+		},
+		add : function( item , after ){
+			return this.insert.apply(this,arguments );	
+		},
+		_insert : function( item , after ){
+			var self = this;
+			var opt = self.C();	
+			var lbody = self.getBody();
+			var list = self.addComponent( lbody,item,after );
+			
+			if( opt.__insertVt ) {
+				clearTimeout(opt.__insertVt);	
+			}
+			opt.__insertVt = setTimeout( function(){
+				var r = self._autoSize();
+				if( !r && opt._checkScrollBar ) {
+					self.methodInvoke('resetViewSize');		
+				}						 
+			},0 );
+			
+			return list;
+		},
+		insert : function(item , after ){
+			var self = this;
+			var opt = self.C();
+			var list = self._insert.apply(self,arguments );	
+			self.fireEvent('onAddComponent',[ list,opt ]);
+			return list;
+		},
+		_empty : function(){
+			var self = this;
+			var opt = self.C();	
+			var lbody = self.getBody();	
+			
+			lbody.empty();
+			
+			self.removeCmp( false );
+			
+			if( opt.__insertVt ) {
+				clearTimeout(opt.__insertVt);	
+			}
+			opt.__insertVt = setTimeout( function(){
+				var r = self._autoSize();
+				if( !r && opt._checkScrollBar ) {
+					self.methodInvoke('resetViewSize');		
+				}						 
+			},0 );
+			
+			return self;
+		},
+		empty : function(){
+			var self = this;
+			var opt = self.C();
+			var x = self._empty.apply(self,arguments );	
+			self.fireEvent('onClearComponent',[ opt ]);
+			return x;
+		},
+		removeAll : function(){
+			return this.empty.apply(this,arguments );		
+		},
+		//判断当前对象是否还存在
+		isExists : function(){
+			var self = this,
+				opt = self.C(),
+				dom = self.getDom();
+			if( dom.size() ) {
+				return true;	
+			} else {
+				if( opt.autoDestroy ) {
+					self.removeCmp(opt.id);	
+				}	
+			}
+		},
 		_setOverCls : function(){
 			var self = this,
 				opt = self.configs,
-				container = opt.views['container'];
+				container = this.el;
 			if( opt.overCls ) {
 				container.addClass( opt.overCls );	
 			}
@@ -447,10 +760,157 @@ xtype html
 		_unsetOverCls : function(){
 			var self = this,
 				opt = self.configs,
-				container = opt.views['container'];
+				container = this.el;
 			if( opt.overCls ) {
 				container.removeClass( opt.overCls );	
 			}
+		},
+		_setPadding : function(){
+			var self = this,
+				opt = self.configs;
+			var bd = self.getBody();
+			bd.css('padding',opt.padding);
+		},
+		focus : function(){
+			var self = this,
+				opt = this.C(),
+				el;
+			if( el = self.getBody() ) {
+				if( opt.tabIndex === false || opt.tabIndex===null ) {
+					el.attr({
+						tabIndex : opt.tabIndex	   
+					});	
+				}	
+				el.focus();
+			}	
+			return self;
+		},
+		scrollLeft : function( sLeft ){
+			var self = this,
+				undef;
+			self.scrollBy( sLeft,undef );	
+			return self;
+		},
+		scrollToLeftEnd : function(){
+			var self = this;
+			var bd = $(self.getBody())[0];
+			if( !bd ) {
+				return self;	
+			}
+			var ch = bd.clientWidth;
+			var sh = bd.scrollWidth;
+			if( sh <= ch ){
+				return self;	
+			}
+			
+			var sTop = sh - ch;
+			self.scrollLeft( sTop );
+			return self;
+		},
+		scrollTop : function( sTop ){
+			var self = this,
+				undef;
+			self.scrollBy( undef,sTop );	
+			return self;	
+		},
+		scrollToTopEnd : function(){
+			var self = this;
+			var bd = $(self.getBody())[0];
+			if( !bd ) {
+				return self;	
+			}
+			var ch = bd.clientHeight;
+			var sh = bd.scrollHeight;
+			
+			if( sh <= ch ){
+				return self;	
+			}
+			
+			var sTop = sh - ch;
+			self.scrollTop( sTop );
+			return self;
+		},
+		scrollBy : function(x,y,ani,func){
+			var self = this,
+				opt = this.C(),
+				undef,
+				func = func || $.noop,
+				el = self.getBody();
+			var pos = {};
+			if( x !== undef ) {
+				pos['scrollLeft'] = x;	
+			}
+			if( y !== undef ) {
+				pos['scrollTop'] = y;	
+			}
+			
+			if( !$.isEmptyObject( pos ) ) {
+				if( ani === undef || ani <= 0 || !ani ) {
+					/*el.animate( pos , 1 , function(){	
+						func.call( self,el );
+					});		*/
+					for( var ac in pos ) {
+						el[ac]( pos[ac] );
+					}
+					func.call( self,el );
+				} else {
+					el.animate( pos , Math.abs(ani) , function(){
+						func.call( self,el );
+					} );	
+				}
+			}
+			return self;
+		},
+		setStyle : function( style ){
+			this.el.css(style || {});
+			return this;		
+		},
+		setBorder : function( str ){
+			this.el.css('border',str);	
+			return this;
+		},
+		setAutoScroll : function(){
+			var self = this,
+				opt = this.C();
+			self.removeCls(opt.autoScrollCls);	
+			return self;
+		},
+		addCls : function( s ){
+			this.el.addClass( s );
+			return this;	
+		},
+		addClass : function( s ){
+			this.addCls( s );	
+			return this;
+		},
+		removeCls : function( s ){
+			this.el.removeClass( s );
+			return this;		
+		},
+		removeClass : function( s ){
+			this.removeCls( s );
+			return this;		
+		},
+		destroy : function(  ){
+			this.el.remove();
+			this.removeCmp(  );
+			return this;
+		},
+		isHidden : function(){},
+		isVisible : function(){},
+		setPosition : function(){},
+		getPosition : function(){},
+		setOverflowXY : function(){},
+		showAt : function(){},
+		hide : function(){
+			var self = this;
+			self.el.hide();
+			return self;	
+		},
+		show : function(){
+			var self = this;
+			self.el.show();
+			return self;		
 		}
 	});
 })(jQuery);
