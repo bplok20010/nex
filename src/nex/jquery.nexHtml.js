@@ -33,12 +33,14 @@ Nex.html组件说明：
 				containerCls : 'nex-html',
 				autoScrollCls : 'nex-html-auto-scroll',
 				_initMethod : [],//初始时扩展调用
-				padding : 0,
+				padding : null,
 				style : {},
 				'class' : '',
 				views : {},
 				attrs : {},
 				html : '',
+				//一般做扩展用，有的组件items是不需要用到的
+				disabledItems : false,
 				items : [],
 				loadMsg : 'Loading...',
 				_lmt : 0,
@@ -94,10 +96,32 @@ Nex.html组件说明：
 			self.bind("onInitComponent",self._setPadding,self);
 			return self;
 		},
+		_setHeightAuto : function(){
+			var self = this;
+			var opt = self.configs;	
+			var views = opt.views;	
+			var bd = self.getBody();
+			var container = self.getContainer();
+			container._removeStyle('height',true);
+			if( bd ) {
+				bd._removeStyle('height',true);	
+			}
+		},
+		_setWidthAuto : function(){
+			var self = this;
+			var opt = self.configs;	
+			var views = opt.views;	
+			var bd = self.getBody();
+			var container = self.getContainer();
+			container._removeStyle('width',true);
+			if( bd ) {
+				bd._removeStyle('width',true);	
+			}
+		},
 		/*如果width height 设置的是百分比那么将返回百分比值，只对resize和初始创建时有效*/
 		getResizeWH : function(){
 			var self = this;
-			var opt = self.C();	
+			var opt = self.configs;	
 			var views = opt.views;
 			var container = self.getContainer();
 			var renderTo = $(opt.renderTo);
@@ -118,7 +142,7 @@ Nex.html组件说明：
 			
 			opt.pWidth = width;
 			opt.pHeight = height;
-			
+			//opt.width opt.height 等于0是 默认就是 100%
 			var w = parseFloat(opt.width) === 0 ? width : opt.width
 				,h = parseFloat(opt.height) === 0 ? height : opt.height;
 
@@ -128,18 +152,22 @@ Nex.html组件说明：
 			if( opt.height.toString().indexOf("%") != -1 ) {
 				h = parseFloat(opt.height)*height/100;
 			}
+			//opt.views 是容器下的所有子容器，如果宽高设置为auto时 会把容器下的所有views设置为auto
+			//如果opt.width 设置的是 auto时。
+			var bd = self.getBody();
 			if( w === 'auto' || isNaN(parseFloat(w)) ) {
-				$.each( views , function(key,_item){
+				/*$.each( views , function(key,_item){
 					_item._removeStyle('width',true);	
-				} );
-				//container._removeStyle('width',true);
+				} );*/
+				self._setWidthAuto();
 				w = container._outerWidth();	
 			}
+			//如果opt.height 设置的是 auto时。
 			if( h === 'auto' || isNaN(parseFloat(h)) ) {
-				//container._removeStyle('height',true);
-				$.each( views , function(key,_item){
+				self._setHeightAuto();
+				/*$.each( views , function(key,_item){
 					_item._removeStyle('height',true);	
-				} );
+				} );*/
 				h = container._outerHeight();	
 			}
 			//因为浏览器会对像素进行 四舍五入 处理 所以应该用parseInt对像素取整 
@@ -262,6 +290,7 @@ Nex.html组件说明：
 		},
 		/*
 		*设置容器大小  @w 宽度 @h 高度 如果传的是func 则作为回调 并且只作为刷新用 @m如果为false 则触发onResize让子组件改变大小
+		* resize(callback)->setContainerSize ->是/否->resetViewSize->onViewSizeChange->是/否->_setViewSize->callback
 		*/
 		resetHtmlSize : function(w,h,m){
 			var self = this,
@@ -269,8 +298,7 @@ Nex.html组件说明：
 				container = self.getContainer(),
 				opt = self.configs,
 				m = m === undef ? true : m;	
-			//var w = self._undef(w,opt.width);
-			//var h = self._undef(h,opt.height);
+				
 			var func = false;
 			if( $.isFunction(w) ) {
 				func = w;
@@ -296,7 +324,9 @@ Nex.html组件说明：
 					}	
 				});	
 			}
-			
+			if( !opt._isInit ) {
+				self.fireEvent('onResize',[ opt ]);
+			}
 			return r;
 		},
 		setHtmlSize : function(w,h){
@@ -490,7 +520,7 @@ Nex.html组件说明：
 		},
 		setContainerEvent : function(){
 			var self = this;
-			var opt = self.C();
+			var opt = self.configs;
 			var container = self.getContainer();
 			
 			//事件绑定
@@ -509,25 +539,25 @@ Nex.html组件说明：
 				}
 			};
 			var events = {
-				'focusin' : function(e) {
+				'focusin.html' : function(e) {
 					callBack.call(this,'onFocusin',e);
 				},
-				'focusout' : function(e) {
+				'focusout.html' : function(e) {
 					callBack.call(this,'onFocusout',e);
 				},
-				'focus' : function(e) {
+				'focus.html' : function(e) {
 					callBack.call(this,'onFocus',e);
 				},
-				'blur' : function(e) {
+				'blur.html' : function(e) {
 					callBack.call(this,'onBlur',e);
 				},
-				'click' : function(e) {
+				'click.html' : function(e) {
 					callBack.call(this,'onClick',e);
 				},
-				'dblclick' : function(e) {
+				'dblclick.html' : function(e) {
 					callBack.call(this,'onDblClick',e);
 				},
-				'scroll' : function(e){
+				'scroll.html' : function(e){
 					callBack.call(this,'onScroll',e);
 					var $this = $(this);
 					if( $this.scrollTop()<=0 ) {
@@ -542,37 +572,37 @@ Nex.html组件说明：
 						self.fireEvent('onScrollLeftEnd',[ this,e,opt ]);	
 					}
 				},
-				'keydown' : function(e) {
+				'keydown.html' : function(e) {
 					callBack.call(this,'onKeyDown',e);
 				},
-				'keyup' : function(e) {
+				'keyup.html' : function(e) {
 					callBack.call(this,'onKeyUp',e);
 				},
-				'keypress' : function(e){
+				'keypress.html' : function(e){
 					callBack.call(this,'onKeyPress',e);
 				},
-				'mousewheel' : function(e){
+				'mousewheel.html' : function(e){
 					callBack.call(this,'onMouseWheel',e);	
 				},
-				'mouseenter' : function(e){
+				'mouseenter.html' : function(e){
 					callBack.call(this,'onMouseEnter',e);
 				},
-				'mouseleave' : function(e){
+				'mouseleave.html' : function(e){
 					callBack.call(this,'onMouseLeave',e);
 				},
-				'mouseover' : function(e){
+				'mouseover.html' : function(e){
 					callBack.call(this,'onMouseOver',e);
 				},
-				'mouseout' : function(e){
+				'mouseout.html' : function(e){
 					callBack.call(this,'onMouseOut',e);
 				},
-				'mousedown' : function(e) {
+				'mousedown.html' : function(e) {
 					callBack.call(this,'onMouseDown',e);
 				},
-				'mouseup' : function(e) {
+				'mouseup.html' : function(e) {
 					callBack.call(this,'onMouseUp',e);
 				},
-				'contextmenu' : function(e){	
+				'contextmenu.html' : function(e){	
 					callBack.call(this,'onContextMenu',e);
 				}
 			};
@@ -582,22 +612,28 @@ Nex.html组件说明：
 					delete events[e];
 				} );	
 			}
-			
+			container.unbind('.html');
 			container.bind(events);
 			self.fireEvent("onSetContainerEvent",[container,opt]);
 			return true;
 		},
 		_disableSelection : function(){
 			var self = this;
-			var opt = self.C();	
+			var opt = self.configs;	
 			var container = self.getContainer();	
 			container.disableSelection();	
 		},
 		setContainer : function(){
 			var self = this;
-			var opt = self.C();
+			var opt = self.configs;	
 			var render = $( $.isWindow(opt.renderTo) ? document.body : opt.renderTo );
-			var container = $('<'+opt.tag+' class="'+opt.containerCls+' '+( opt.autoScroll ? opt.autoScrollCls : '' )+' '+( opt.border ? opt.borderCls : '' )+' '+opt.cls+' '+ opt['class'] +'" id="'+opt.id+'"></'+opt.tag+'>');
+			//如果有ID重复的组件 则覆盖
+			var container = $('#'+opt.id);
+			if( !container.length ) {
+				container = $('<'+opt.tag+' class="'+opt.containerCls+' '+( opt.autoScroll ? opt.autoScrollCls : '' )+' '+( opt.border ? opt.borderCls : '' )+' '+opt.cls+' '+ opt['class'] +'" id="'+opt.id+'"></'+opt.tag+'>');
+			} else {
+				container.html('');	//Nex.gc();
+			}
 			render.append(container);
 			opt.views['container'] = container;
 			//方便使用
@@ -648,6 +684,10 @@ Nex.html组件说明：
 			
 			return false;
 		},
+		//判断当前是否正在初始化
+		_isInit : function(){
+			return 	this.configs._isInit;
+		},
 		initComponent : function(func){
 			var self = this;
 			var opt = self.configs;	
@@ -666,8 +706,9 @@ Nex.html组件说明：
 		},
 		_appendContent : function(){
 			var self = this;
-			var opt = self.C();	
+			var opt = self.configs;	
 			var lbody = self.getBody();
+			if( opt.disabledItems ) return lbody;
 			var items = opt['html'];
 			self.addComponent( lbody,items );
 			var items = opt['items'];
@@ -700,14 +741,14 @@ Nex.html组件说明：
 		},
 		insert : function(item , after ){
 			var self = this;
-			var opt = self.C();
+			var opt = self.configs;	
 			var list = self._insert.apply(self,arguments );	
 			self.fireEvent('onAddComponent',[ list,opt ]);
 			return list;
 		},
 		_empty : function(){
 			var self = this;
-			var opt = self.C();	
+			var opt = self.configs;	
 			var lbody = self.getBody();	
 			
 			lbody.empty();
@@ -728,7 +769,7 @@ Nex.html组件说明：
 		},
 		empty : function(){
 			var self = this;
-			var opt = self.C();
+			var opt = self.configs;	
 			var x = self._empty.apply(self,arguments );	
 			self.fireEvent('onClearComponent',[ opt ]);
 			return x;
@@ -739,7 +780,7 @@ Nex.html组件说明：
 		//判断当前对象是否还存在
 		isExists : function(){
 			var self = this,
-				opt = self.C(),
+				opt = self.configs,
 				dom = self.getDom();
 			if( dom.size() ) {
 				return true;	
@@ -769,11 +810,13 @@ Nex.html组件说明：
 			var self = this,
 				opt = self.configs;
 			var bd = self.getBody();
-			bd.css('padding',opt.padding);
+			if( opt.padding !== null ) {
+				bd.css('padding',opt.padding);
+			}
 		},
 		focus : function(){
 			var self = this,
-				opt = this.C(),
+				opt = this.configs,
 				el;
 			if( el = self.getBody() ) {
 				if( opt.tabIndex === false || opt.tabIndex===null ) {
@@ -832,7 +875,7 @@ Nex.html组件说明：
 		},
 		scrollBy : function(x,y,ani,func){
 			var self = this,
-				opt = this.C(),
+				opt = this.configs,
 				undef,
 				func = func || $.noop,
 				el = self.getBody();
@@ -871,7 +914,7 @@ Nex.html组件说明：
 		},
 		setAutoScroll : function(){
 			var self = this,
-				opt = this.C();
+				opt = this.configs;
 			self.removeCls(opt.autoScrollCls);	
 			return self;
 		},
@@ -892,6 +935,7 @@ Nex.html组件说明：
 			return this;		
 		},
 		destroy : function(  ){
+			this.el.data('_nexInstance_',null);
 			this.el.remove();
 			this.removeCmp(  );
 			return this;

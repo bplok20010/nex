@@ -165,6 +165,9 @@ var ourl = urlResolve('http://www.jb51.net//da/b/c/e/f?a=4&b=6#em?a=4&n=4',true)
 						 console.log(d.id);
 					 })
 					 .otherwise( '/459' )
+					  .otherwise( function(){
+						console.log('otherwise'); 
+					 } )
 					 .when('/view/:id',function(){console.log(111);})
 					 .when('/view/',function(){console.log(1111);});
 			});

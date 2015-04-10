@@ -25,6 +25,7 @@ qq : 505931977
 			width : '100%',
 			height : '100%',
 			easing : 'easeOutCirc',
+			easingOut : 'easeOutCirc',//easeInCirc
 			layouts : ['north','south','west','east'],
 			isCreate : false,
 			closeTime : 300,
@@ -38,7 +39,7 @@ qq : 505931977
 			style : {},//css
 			bodyCls : '',
 			bodyStyle : {},
-			padding : 0,
+			padding : null,
 			dblclickToClose : true,
 			_north : {
 				handles : 's',
@@ -185,7 +186,9 @@ qq : 505931977
 			var self = this,
 				opt = self.configs;
 			var bd = self.getContainer();
-			bd.css('padding',opt.padding);
+			if( opt.padding !== null ) {
+				bd.css('padding',opt.padding);
+			}
 		},
 		getBody : function(){
 			var self = this,
@@ -222,7 +225,7 @@ qq : 505931977
 			self.resetHtmlSize();
 			self.unLockEvent('onSizeChange');
 			
-			self.createLayouts();
+			self._createLayouts();
 			
 			self.fireEvent('onCreate',[opt]);
 			opt._isInit = false;
@@ -233,13 +236,13 @@ qq : 505931977
 			var opt = self.configs;
 			Nex.Html.fn._sysEvents.apply(self,arguments);
 			//self.bind("onRegionSizeChange",self.setExpandSize);	
-			self.bind("onRegionCreate",self.bindReginEvent);
+			self.bind("onRegionCreate._sys",self.bindReginEvent,self);
 		//	self.bind("onRegionCreate",self.onRegionCreate);
 			//self.bind("onCreate",self.onCreate);	
-			self.bind("onRegionCreate",self.closeDefault);	
-			self.bind("onSplitBtnClick",self.splitClickToClose);
-			self.bind("onSplitDblClick",self.splitDblClickToClose);
-			self.bind("onRegionCreate",self.dragSplit);
+			self.bind("onRegionCreate._sys",self.closeDefault,self);	
+			self.bind("onSplitBtnClick._sys",self.splitClickToClose,self);
+			self.bind("onSplitDblClick._sys",self.splitDblClickToClose,self);
+			self.bind("onRegionCreate._sys",self.dragSplit,self);
 		},
 		dragSplit : function(region){
 			var self = this,opt=this.C();
@@ -536,6 +539,8 @@ qq : 505931977
 			
 			var r = self.fireEvent('onBeforeRegionSizeChange',[region]);
 			if( r===false ) return r;
+			//var r = self.fireEvent('onBefore'+self._toUpperCase(region)+'SizeChange',[region]);
+			//if( r===false ) return r;
 			
 			var layoutW = self.getBodyWidth();
 			var layoutH = self.getBodyHeight();
@@ -606,15 +611,24 @@ qq : 505931977
 				}
 				
 			} else {//center
+				region = 'center';
 				var $region = $("#"+opt.id+'_'+region);	
+				var w = $region.width();
+				var h = $region.height();
 				$region._outerWidth( layoutW-self.getRegionSize('west')-self.getRegionSize('east') );
 				$region._outerHeight( layoutH-self.getRegionSize('north')-self.getRegionSize('south') );
+				var _w = $region.width();
+				var _h = $region.height();
+				if( w != _w || h != _h ) {
+					isChange = true;	
+				}
 			}
 			
 			self.setExpandSize(region);
 			
 			if(  isChange ) {
 				self.fireEvent('onRegionSizeChange',[region]);
+				//self.fireEvent('on'+self._toUpperCase(region)+'SizeChange',[opt]);
 			}
 			return true;
 		},
@@ -723,6 +737,7 @@ qq : 505931977
 					}
 				}
 			} else { //center
+				region = 'center';
 				var left = 0,top = 0;
 				var $region = $("#"+opt.id+'_'+region);
 				$region.css({
@@ -744,13 +759,13 @@ qq : 505931977
 			
 			var r = self.fireEvent('onBeforeOpenRegion',[region]);
 			if( r === false ) return r;
-			var r = self.fireEvent('onBefore'+ self._toUpperCase(region) +'Open',[region]);
+			var r = self.fireEvent('onBefore'+ self._toUpperCase(region) +'Open',[]);
 			if( r === false ) return r;
 			
 			var openCallBack = function(){
 				self.refresh();
 				self.fireEvent('onOpenRegion',[region]);	
-				self.fireEvent('on'+ self._toUpperCase(region) +'Open',[region]);
+				self.fireEvent('on'+ self._toUpperCase(region) +'Open',[]);
 				//设置split bar css
 				$("#"+opt.id+"_"+region+"_split").removeClass("nex-layout-split-closed nex-layout-"+region+"-split-closed");
 			}
@@ -802,12 +817,12 @@ qq : 505931977
 			
 			var r = self.fireEvent('onBeforeCloseRegion',[region]);
 			if( r === false ) return r;
-			var r = self.fireEvent('onBefore'+ self._toUpperCase(region) +'Close',[region]);
+			var r = self.fireEvent('onBefore'+ self._toUpperCase(region) +'Close',[]);
 			if( r === false ) return r;
 			
 			var closeCallBack = function(){
 				self.fireEvent('onCloseRegion',[region]);	
-				self.fireEvent('on'+ self._toUpperCase(region) +'Close',[region]);
+				self.fireEvent('on'+ self._toUpperCase(region) +'Close',[]);
 				//设置split bar css
 				$("#"+opt.id+"_"+region+"_split").addClass("nex-layout-split-closed nex-layout-"+region+"-split-closed");
 			}
@@ -822,12 +837,12 @@ qq : 505931977
 			if( pos !== -1 ) {
 				regions.splice(pos,1);
 			}
-			self.refresh();
+			
+			self.refresh(regions);
 			//只设置当前正在关闭的split bar
 			self.setRegionPos(region,false);
 			
 			var $region = $("#"+opt.id+'_'+region);
-			
 			switch( region ) {
 				case 'north' :
 					$region.animate({
@@ -836,9 +851,9 @@ qq : 505931977
 						closeCallBack();
 					});
 					break;
-				case 'south'://easeInCirc
+				case 'south':
 					$region.animate({
-						top : layoutH+$region._outerHeight()				 
+						top : layoutH	 
 					},opt.closeTime,opt.easing,function(){
 						closeCallBack();
 					});
@@ -850,9 +865,9 @@ qq : 505931977
 						closeCallBack();
 					});
 					break;
-				case 'east'://easeInCirc
+				case 'east':
 					$region.animate({
-						left : layoutW+$region._outerWidth()				 
+						left : layoutW		 
 					},opt.closeTime,opt.easing,function(){
 						closeCallBack();
 					});
@@ -954,6 +969,9 @@ qq : 505931977
 			if( r === false ) return r;
 			self.refresh();
 		},
+		/*
+		*继承浏览器大小改变时 会调用
+		*/
 		_setViewSize : function(w,h){
 			var self = this,
 				opt = self.configs,
@@ -969,10 +987,16 @@ qq : 505931977
 		resetViewSize : function( func ){
 			var self = this,
 				opt = self.configs;	
-			Nex.Html.fn.resetViewSize.apply(self,arguments);
-			if( !opt._isInit ) {
-				self.refresh();//解决初始时就调用refresh api
-			}
+			var callback = function(){
+				if( !opt._isInit ) {
+					self._refresh();//初始化时 这个不需要调用
+				}	
+				if( func && $.isFunction( func ) ) {
+					func();	
+				}
+			};	
+			Nex.Html.fn.resetViewSize.apply(self,[callback]);
+			
 			return self;
 		},
 		//首字母大写
@@ -1032,7 +1056,10 @@ qq : 505931977
 			
 			return true;
 		},
-		createLayouts : function(){
+		/*
+		*初始化布局
+		*/
+		_createLayouts : function(){
 			var self = this;
 			var opt = self.configs;
 			
@@ -1049,16 +1076,17 @@ qq : 505931977
 				_lbody[ _l[i] ] = _lb;
 				//初始化设置大小和位置 可以加isClosed = true的时候 才执行下面
 				//layout 不占用太多性能 可不考虑
-				self.setRegionSize( _l[i] );	
-				self.setRegionPos( _l[i] );		
+				self.denyEventInvoke( 'setRegionSize',_l[i] );
+				self.denyEventInvoke( 'setRegionPos',_l[i] );	
 			}
 			
 			for( var i=0;i<opt.layouts.length;i++ ) {
 				self.fireEvent('onRegionCreate',[opt.layouts[i],_lbody[ opt.layouts[i] ]]);
 				self.fireEvent('on'+self._toUpperCase(opt.layouts[i])+'Create',[opt.layouts[i],_lbody[ opt.layouts[i] ]]);
 			}
-			
-			self._refresh();	
+			//初始化创建时 不应该触发regionResize事件
+			self.denyEventInvoke( '_refresh' );
+			//self._refresh();	
 			
 			for( var i=0;i<_l.length;i++ ) {	
 				self._appendContent(_l[i],_lbody[ _l[i] ]);
@@ -1091,34 +1119,4 @@ qq : 505931977
 			return self;
 		}
 	});
-	$.fn.layout = function(options, param){
-		var options = options || {};
-		if (typeof options == 'string'){
-			switch(options) {
-				case 'options':
-					return $.data(this[0],'nex.layout').C();
-				default : 
-					return this.each(function(){
-						if( param ) {
-							$(this).data('nex.layout').C(options,param);
-						}
-					}); 
-			}
-		}
-		var list = [];
-		return this.each(function(){
-			var opt;
-			var self = $.data(this, 'nex.layout');
-			if (self) {
-				opt = self.configs;
-				$.extend(opt, options);
-				list.push(self);
-				return;
-			}
-			options.target = $(this);
-			var layout = new layout(options);
-			list.push(layout);
-		});
-		return list.length === 1 ? list[0] : list;
-	};
 })(jQuery);

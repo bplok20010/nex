@@ -27,14 +27,14 @@
         <script type="text/javascript">
 		var sel;
 		$(function(){
-			sel = Nex.Create('searchfield',{
+			sel = Nex.Create('selectfield',{
 				renderTo : '#base',
 				name : 'abc',
+				labelText : "1111111", 
 				onFocus : function(){
 					//this.selectShowList();	
 				},
 				items : [
-					{ text:'a' },
 					{ text:'test2',value:'test2' },
 					{ text:'test3',value:'test3' },
 					{ text:'test4',value:'test4' }
@@ -47,7 +47,6 @@
 					this.selectShowList();	
 				},
 				items : [
-					{ text:'a' },
 					{ text:'test2',value:'test2' },
 					{ text:'test3',value:'test3' },
 					{ text:'test4',value:'test4' }

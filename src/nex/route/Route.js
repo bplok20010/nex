@@ -6,7 +6,7 @@ index.html#/Home/Login
 
 ;(function($){
 	"use strict";
-	var route = Nex.define('Nex.Route').setXType('route');
+	var route = Nex.define('Nex.route.Route').setXType('route').setAliasName('Nex.Route');
 	route.extend({
 		version : '1.0',
 		getDefaults : function(opt){
@@ -246,10 +246,16 @@ index.html#/Home/Login
 			self.currentUrl = hash;
 			self.history.push( hash );
 			
-			var e = self.fireEvent('onVisitPage',[ hash ]);
+			var _hash = {
+				hash : hash
+			};
+			
+			var e = self.fireEvent('onVisitPage',[ _hash ]);
 			if( e === false ) {
 				return;	
 			}
+			
+			self.currentUrl = _hash.hash === hash ? self.currentUrl : _hash.hash;
 			
 			if( hash ) {
 				var ourl = self.urlResolve(hash);
@@ -268,7 +274,7 @@ index.html#/Home/Login
 				} );	
 			}
 			
-			var r = self.parseRoute( path );
+			var r = self.parseRoute( path ) || {};
 			
 			self.currentUrlData = r;
 			

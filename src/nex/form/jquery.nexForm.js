@@ -3234,6 +3234,49 @@ email:zere.nobo@gmail.com or QQ邮箱
 			};
 			radios.bind(events);
 		},
+		_getRadiosItems : function( items ){
+			var self = this,
+				opt = self.configs;
+			var text = [];	
+			var d = {
+				id : opt.id	
+			};
+			for(var i=0;i<items.length;i++) {
+				if( !$.isPlainObject( items[i] ) ) {
+					continue;
+				}
+				var _item = items[i] = $.extend({},opt._item,items[i]);
+				_item.value = self._undef( _item.value,_item.text );
+				_item.text = self._undef( _item.text,_item.value );
+				
+				if(_item.disabled){
+					_item.attrs += 'disabled';
+					_item.cls +=' nex-form-disabled-radio';
+				}
+				if(_item.readOnly){
+					_item.attrs += ' readOnly ';
+					_item.cls +=' nex-form-readonly-radio';
+				}
+				
+				var str = '<div class="nex-form-radio-item '+_item.cls+'" ><input '+_item.attrs+' type="radio" id="'+d.id+'-input-'+i+'" value="'+_item.value+'" name="'+opt.name+'" class="nex-form-field nex-form-radio" ><label id="'+d.id+'-label-input-'+i+'" class="nex-form-cb-label nex-form-cb-label-after" for="'+d.id+'-input-'+i+'">'+_item.text+'</label></div>';
+				text.push(str);
+				if( _item.display == 'block' ) {
+					text.push('<div class="nex-clear"></div>');	
+				}
+			}
+			text.push('<div class="nex-clear"></div>');	
+			return text.join('');	
+		},
+		resetradioItems : function( items ){
+			var self = this,
+				opt = self.configs;
+			var v = self.val();	
+			var text = $("#"+opt.id+"-radio-wraper");
+			text.html( self._getRadiosItems( items || opt.items ) );
+			self.radioBindEvent();
+			self.val( v );
+			return self;
+		},
 		radioTpl : function(d){
 			if( !d ) return "";
 			var self = this,
@@ -3245,30 +3288,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 					text.push('<td class="nex-form-item-body" id="'+d.id+'-body" style="width: 100%;">');	
 						text.push('<div id="'+d.id+'-radio-wraper" class="nex-form-radio-wraper">');
 							var items = opt.items;
-							for(var i=0;i<items.length;i++) {
-								if( !$.isPlainObject( items[i] ) ) {
-									continue;
-								}
-								var _item = items[i] = $.extend({},opt._item,items[i]);
-								_item.value = self._undef( _item.value,_item.text );
-								_item.text = self._undef( _item.text,_item.value );
-								
-								if(_item.disabled){
-									_item.attrs += 'disabled';
-									_item.cls +=' nex-form-disabled-radio';
-								}
-								if(_item.readOnly){
-									_item.attrs += ' readOnly ';
-									_item.cls +=' nex-form-readonly-radio';
-								}
-								
-								var str = '<div class="nex-form-radio-item '+_item.cls+'" ><input '+_item.attrs+' type="radio" id="'+d.id+'-input-'+i+'" value="'+_item.value+'" name="'+opt.name+'" class="nex-form-field nex-form-radio" ><label id="'+d.id+'-label-input-'+i+'" class="nex-form-cb-label nex-form-cb-label-after" for="'+d.id+'-input-'+i+'">'+_item.text+'</label></div>';
-								text.push(str);
-								if( _item.display == 'block' ) {
-									text.push('<div class="nex-clear"></div>');	
-								}
-							}
-							text.push('<div class="nex-clear"></div>');	
+							text.push( self._getRadiosItems( items ) );	
 						text.push('</div>');
 					text.push('</td>');
 				text.push('</tr>');
@@ -3367,6 +3387,49 @@ email:zere.nobo@gmail.com or QQ邮箱
 			};
 			checkboxs.bind(events);
 		},
+		_getCheckboxsItems : function( items ){
+			var self = this,
+				opt = self.configs;
+			var text = [];	
+			var d = {
+				id : opt.id	
+			};
+			for(var i=0;i<items.length;i++) {
+				if( !$.isPlainObject( items[i] ) ) {
+					continue;
+				}
+				var _item = items[i] = $.extend(true,{},opt._item,items[i]);
+				_item.value = self._undef( _item.value,_item.text );
+				_item.text = self._undef( _item.text,_item.value );
+				
+				if(_item.disabled){
+					_item.attrs += 'disabled';
+					_item.cls +=' nex-form-disabled-checkbox';
+				}
+				if(_item.readOnly){
+					_item.attrs += ' readOnly ';
+					_item.cls +=' nex-form-readonly-checkbox';
+				}
+				
+				var str = '<div class="nex-form-checkbox-item '+_item.cls+'" ><input '+_item.attrs+' type="checkbox" id="'+d.id+'-input-'+i+'" value="'+_item.value+'" name="'+opt.name+'" class="nex-form-field nex-form-checkbox" ><label id="'+d.id+'-label-input-'+i+'" class="nex-form-cb-label nex-form-cb-label-after" for="'+d.id+'-input-'+i+'">'+_item.text+'</label></div>';
+				text.push(str);
+				if( _item.display == 'block' ) {
+					text.push('<div class="nex-clear"></div>');	
+				}
+			}
+			text.push('<div class="nex-clear"></div>');	
+			return text.join('');	
+		},
+		resetcheckboxItems : function(items){
+			var self = this,
+				opt = self.configs;
+			var v = self.val();	
+			var text = $("#"+opt.id+"-checkbox-wraper");	
+			text.html( self._getCheckboxsItems( items || opt.items ) );
+			self.checkboxBindEvent();
+			self.val( v );
+			return self;
+		},
 		checkboxTpl : function(d){
 			if( !d ) return "";
 			var self = this,
@@ -3378,30 +3441,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 					text.push('<td class="nex-form-item-body" id="'+d.id+'-body" style="width: 100%;">');	
 						text.push('<div id="'+d.id+'-checkbox-wraper" class="nex-form-checkbox-wraper">');
 							var items = opt.items;
-							for(var i=0;i<items.length;i++) {
-								if( !$.isPlainObject( items[i] ) ) {
-									continue;
-								}
-								var _item = items[i] = $.extend(true,{},opt._item,items[i]);
-								_item.value = self._undef( _item.value,_item.text );
-								_item.text = self._undef( _item.text,_item.value );
-								
-								if(_item.disabled){
-									_item.attrs += 'disabled';
-									_item.cls +=' nex-form-disabled-checkbox';
-								}
-								if(_item.readOnly){
-									_item.attrs += ' readOnly ';
-									_item.cls +=' nex-form-readonly-checkbox';
-								}
-								
-								var str = '<div class="nex-form-checkbox-item '+_item.cls+'" ><input '+_item.attrs+' type="checkbox" id="'+d.id+'-input-'+i+'" value="'+_item.value+'" name="'+opt.name+'" class="nex-form-field nex-form-checkbox" ><label id="'+d.id+'-label-input-'+i+'" class="nex-form-cb-label nex-form-cb-label-after" for="'+d.id+'-input-'+i+'">'+_item.text+'</label></div>';
-								text.push(str);
-								if( _item.display == 'block' ) {
-									text.push('<div class="nex-clear"></div>');	
-								}
-							}
-							text.push('<div class="nex-clear"></div>');	
+							text.push(self._getCheckboxsItems( items ));	
 						text.push('</div>');
 					text.push('</td>');
 				text.push('</tr>');

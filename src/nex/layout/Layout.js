@@ -38,7 +38,7 @@ qq : 505931977
 			style : {},//css
 			bodyCls : '',
 			bodyStyle : {},
-			padding : 0,
+			padding : null,
 			dblclickToClose : true,
 			_north : {
 				handles : 's',
@@ -185,7 +185,9 @@ qq : 505931977
 			var self = this,
 				opt = self.configs;
 			var bd = self.getContainer();
-			bd.css('padding',opt.padding);
+			if( opt.padding !== null ) {
+				bd.css('padding',opt.padding);
+			}
 		},
 		getBody : function(){
 			var self = this,

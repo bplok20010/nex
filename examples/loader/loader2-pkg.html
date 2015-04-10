@@ -16,13 +16,15 @@
         <script src="../../src/nex/jquery.mousewheel.js"></script>
         <script src="../../src/nex/jquery.nexBase.js"></script>
         <script src="../../src/nex/jquery.nexHtml.js"></script>
+        <script src="../../src/nex/jquery.nexAjax.js"></script>
         <script src="../../src/nex/loader/loader.js"></script>
         <script src="../../src/nex/component2path.js"></script>
+        <script src="../../src/nex/util/String.js"></script>
     </head>
     <body style="height:100%;">
-    	
+    	<button onClick="load();">Load</button>
 		<div id="base" style="width:80%; overflow:hidden; height:900px;"></div>
-        <div class="container" he>
+        <div class="container" >
             
             <div style="border:4px solid red;  width:100px; padding:10px; height:100px; overflow:auto;" id="bd">ddddddddddddddddddd<br>dddddddd<br>dd<br>dd<br>dd<br>dd<br>ddddddddddddddddddddddddddddddddddd</div>
         </div>
@@ -31,7 +33,9 @@
 			//loader.C('loadOrder',true);
 			/*loader.bind('onBeforeParseScriptName',function(a){
 				console.log( a,'---------' );	
-			});
+			});*/
+			loader.setPath('OSC','./');
+			loader.setPathProcess(/^OSC[^\/]*/);
 			Define('m4',{b:'m4'});
 			Define('m2','m2');
 			Define( 'm3',['m4'],function(m4){
@@ -41,16 +45,62 @@
 				return 'm1'	;
 			} );
 			Define('A',['m1'],function(m1){
+				console.log(m1)
 				return 'A';
 			});
 			Require( ['A'],function(t){
 				console.log(t);	
-			} );*/
-			Nex.require(['m1'],function(){
+			} );
+			/*Nex.require(['m1'],function(){
 				var list = Nex.getLoader().getLoadQueues();
 				console.log( list );	
+			});*/
+			function load(){
+				/*Nex.require(['m6'],function(){
+					console.log(22);
+					Nex.require(['m2'],function(){
+						console.log(11);
+						Nex.require(['m3'],function(){
+							console.log(33);
+						});	
+					});	
+				}).done( function(){
+					console.log(85)	
+				} );;	*/
+				Nex.setLoaderShims({
+					't5' : ['t8'],
+					't2' : ['t4','t5'],
+					't3' : ['t6','t7']	
+				});
+				$require(['data4.php','t1'],function(a,b,c,d,e){
+				}).progress( function(v){ console.log(v+'%','1111') } )
+				.done( function(){
+					console.log(12)	
+				} );;;
+				$require(['t1','x.css','a.txt','x2.css'],function(a,b,c,d,e){
+				}).progress( function(v){ console.log(v+'%','2222') } )
+				.done( function(){
+					console.log(121)	
+				} );;;
+				//Nex.Loader.abort();
+				/*Nex.require([
+					't1'
+					,'t2'
+					,'t3'
+					,'t4'
+					,'t5'
+					,'t6'
+					
+				],function(){
+					console.log( arguments );	
+				});	*/
+			}
+			Nex.require(['Nex.util.String','Nex.util.MD5','OSC','OSC.Com'],function(c,b,m,u,s){
+				//var str = '<div id="5">789</div>';
+				console.log( c,typeof b,m.getXType() );
+				//$('#logs').html( s.HTMLEncode(str) );	
 			});
-			
 		</script>
+        <div id="logs"></div>
     </body>
 </html>

@@ -13,19 +13,18 @@ $("#t1").showAt("#t2"[,{xAlign:'right'}]);
 
 ;(function($){
 	"use strict";
-	var showAt = Nex.widget('showAt');
-
-	$.showAt = $.nexShowAt = showAt;
-	
+	var showAt = Nex.define('Nex.showAt').setXType('showAt').setXType('showat');
 	showAt.extend({
 		version : '1.0',
 		getDefaults : function(opt){
 			var _opt = {
 				prefix : 'showAt-',
+				denyManager : true,
 				autoDestroy : true,
 				source : null,
 				autoShow : false,//是否自动显示
 				openAtOpt : true,//开启后 可使用参数 at 代替el来设置，只是助于理解
+				at : null,
 				el : null,// 相当于at 或者 一个 坐标eg {left:0,top:2}
 				parent : document.body,//source 的父元素 会自动获取offsetParent
 				autoRegion : true,//自动调整显示方位
@@ -52,11 +51,21 @@ $("#t1").showAt("#t2"[,{xAlign:'right'}]);
 			return $.extend({},_opt,opt);
 		}
 	});
-	$.showAt.fn.extend({
+	showAt.fn.extend({
 		_init : function(opt) {
 			var self = this,undef;
-			if( opt.source===null ) return false;
-			if( opt.openAtOpt && opt.at !== undef ) {
+			
+			self.parseSource()
+				.parseEl();
+			
+			self.fireEvent("onCreate",[opt]);	
+			
+		},
+		parseSource : function(){
+			var self = this;
+			var opt = self.configs;	
+			
+			if( opt.openAtOpt && opt.at !== null ) {
 				opt.el = opt.at;	
 			}
 			var s = $(opt.source);
@@ -69,7 +78,11 @@ $("#t1").showAt("#t2"[,{xAlign:'right'}]);
 			}
 			//曾经在chrome下获取得到的是一个html
 			opt.parent = opt.parent.is('html') ? $(document.body) : opt.parent;
-			
+			return self;
+		},
+		parseEl : function(){
+			var self = this;
+			var opt = self.configs;	
 			if( opt.el === null ) {
 				opt.el = opt.parent;
 				if( opt.el.is('body') ) {
@@ -81,9 +94,7 @@ $("#t1").showAt("#t2"[,{xAlign:'right'}]);
 				}
 			}
 			opt.el = (opt.el === document) ? window : opt.el;
-			
-			self.fireEvent("onCreate",[opt]);	
-			
+			return self;
 		},
 		_sysEvents : function(){
 			var self = this;
@@ -173,11 +184,15 @@ $("#t1").showAt("#t2"[,{xAlign:'right'}]);
 		getShowSpace : function(el,parent){
 			var self = this,undef;
 			var opt = self.configs;
+			if( opt.el === undef && parent ) {
+				el = parent;	
+			}
 			var el = self._undef(el,opt.el);
+			var parent = self._undef(parent,opt.parent);
 			//需要获取的对象
 			var obj = $(el);
 			
-			var renderTo = self.getRender(parent);
+			var renderTo = self.getRender(parent);//getOffsetParent
 			
 			//获取窗口显示区域大小
 			var cw = $(renderTo).width();
@@ -198,26 +213,32 @@ $("#t1").showAt("#t2"[,{xAlign:'right'}]);
 			
 			return space;
 		},
+		/*
+		*检测是否有足够的空间显示
+		*@param a bottom top right left
+		*@param el 
+		*/
 		checkSpace : function(a,s,e,r){
 			var self = this;
 			var opt = self.configs;	
-			var space = self.getShowSpace();
+			var space = self.getShowSpace();// opt.el,opt.parent
 			if( space[a]<=0 ) return false;
+			var r = true;
 			switch(a){
 				case 'bottom':
-					return s.height>space.bottom?false:true;
+					r = s.height>space.bottom?false:true;
 					break;
 				case 'top' : 
-					return s.height>space.top?false:true;
+					r =  s.height>space.top?false:true;
 					break;
 				case 'right' :
-					return s.width>space.right?false:true;
+					r = s.width>space.right?false:true;
 					break;
 				case 'left' :
-					return s.width>space.left?false:true;
+					r = s.width>space.left?false:true;
 					break;
 			};
-			return true;
+			return r;
 		},
 		/*
 		*根据当前的设置自动适配对应显示位置
@@ -230,8 +251,8 @@ $("#t1").showAt("#t2"[,{xAlign:'right'}]);
 			var yAlign = opt.yAlign.toLowerCase();
 			var space = self.getShowSpace();
 			
-			var r = self.fireEvent('onBeforeAdaptRegion',[xAlign,yAlign,zAlign,opt]);
-			if( r === false ) return false;
+			var _r = self.fireEvent('onBeforeAdaptRegion',[/*xAlign,yAlign,zAlign,*/opt]);
+			if( _r === false ) return false;
 			if( zAlign==='y' ) {
 				if( yAlign==='center' ) return;
 				var sp = self.checkSpace(yAlign,s,e,r);
@@ -267,7 +288,7 @@ $("#t1").showAt("#t2"[,{xAlign:'right'}]);
 					}
 				}	
 			}	
-			self.fireEvent('onAdaptRegion',[opt.xAlign,opt.yAlign,opt.zAlign,opt]);
+			self.fireEvent('onAdaptRegion',[/*opt.xAlign,opt.yAlign,opt.zAlign,*/opt]);
 		},
 		/*是否出现水平滚动条*/ 
 		//scrollHeight scrollWidth
@@ -468,28 +489,45 @@ $("#t1").showAt("#t2"[,{xAlign:'right'}]);
 			//位置的最后修改
 			return p;
 		},
+		/*
+		*显示到指定位置
+		*@param left 可选,
+		*@param top 可选
+		*/
+		showAtPos : function(left, top){},
+		/*
+		*@param el 可选 如果为可选 则默认使用opt.source
+		*@param options 可选 显示参数
+		*/
+		showAtEl : function(el, options){},
 		show : function(){
 			var self = this,
 				opt=this.configs;	
-			var pos = self.getShowPos();
+			//不建议在这里获取坐标
+			//因为如果改变at的position为absolute时 source的位置会改变，使得showAt会出现错乱	
+			//var pos = self.getShowPos();
 			var r = self.fireEvent("onBeforeShow",[pos,opt]);
 			if( r === false ) return false;
 			var callBack = function(){
 				self.fireEvent("onShow",[pos,opt]);	
 			}
 			if( $.isFunction(opt.animate) ) {
+				var pos = self.getShowPos();//单独获取
 				opt.animate.call(self,opt.source,pos,callBack);	
 			} else {
+				var src = $(opt.source);
 				var position = $(opt.source).css('position');
 				if( position === 'static' || position === 'relative' ) {
-					pos.position = 'absolute';
+					//pos.position = 'absolute';
+					src.css('position','absolute');
 				}
-				$(opt.source).css(pos).show();
+				var pos = self.getShowPos();//单独获取
+				src.css(pos).show();
 				callBack();
 			}
 		}
 	});
-	$.fn.nexShowAt = function(options,conf){
+	$.fn.showAt = function(options,conf){
 		var undef,opt;
 		var conf = conf === undef ? {} : conf;
 		if( options === undef ) {
@@ -503,12 +541,12 @@ $("#t1").showAt("#t2"[,{xAlign:'right'}]);
 		var list = [];
 		this.each(function(){
 			opt.source = $(this);
-			var o = new Nex.showAt(opt);
-			o.show();
+			opt.autoShow = true;
+			var o = Nex.Create('showAt',opt);
+			//o.show();
 			list.push(o);
-			$(this).data('nex.showAt',o);
+			//$(this).data('nex.showAt',o);
 		});
 		return list.length === 1 ? list[0] : list;
 	};
-	$.fn.showAt = $.fn.nexShowAt;
 })(jQuery);

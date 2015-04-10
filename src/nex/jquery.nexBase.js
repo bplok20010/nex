@@ -20,7 +20,8 @@ v1.0
 *********************/
 var Nex = Nex || (function(win,$){
 	"use strict";	
-	var uaMatch = /msie ([\w.]+)/.exec( navigator.userAgent.toLowerCase() ) || [];
+	var userAgent = navigator.userAgent.toLowerCase();
+	var uaMatch = /msie ([\w.]+)/.exec( userAgent ) || [];
 	function getCurrentScript(h) {
 		var stack,
 			DOC = document,
@@ -75,12 +76,19 @@ var Nex = Nex || (function(win,$){
 		scrollbarSize : false,
 		resizeOnHidden : true,
 		isOpera : typeof opera !== 'undefined' && opera.toString() === '[object Opera]',
+		isChrome : /\bchrome\b/.test( userAgent ),
+        isWebKit : /webkit/.test( userAgent ),
 		isIE : uaMatch.length ? true : false,
 		IEVer : parseFloat( uaMatch[ 1 ], 10 ), //如果非IE 会是NaN
 		isIE6 : parseFloat( uaMatch[ 1 ], 10 ) === 6, 
 		isIE7 : parseFloat( uaMatch[ 1 ], 10 ) === 7, 
 		isIE8 : parseFloat( uaMatch[ 1 ], 10 ) === 8, 
 		isIE9 : parseFloat( uaMatch[ 1 ], 10 ) === 9, 
+		/*
+		*根据参数返回模版对象
+		*@param {Object} o ltag rtag simple(简单模式) 
+		*@return {Object}
+		*/
 		getTemplate : function( o ){
 			var o = o || {};
 			return {
@@ -133,6 +141,9 @@ var Nex = Nex || (function(win,$){
 				}	
 			};	
 		},
+		/*
+		*dirname
+		*/
 		dirname : function(baseUrl){
 			baseUrl = baseUrl + '';
 			baseUrl = baseUrl.split('/');
@@ -140,7 +151,10 @@ var Nex = Nex || (function(win,$){
 			baseUrl = baseUrl.join('/');
 			return baseUrl;
 		},
-		/*safair不支持*/
+		/*
+		*private
+		*safair不支持
+		*/
 		getcwd : function(h){
 			return getCurrentScript(h);	
 		},
@@ -171,6 +185,11 @@ var Nex = Nex || (function(win,$){
 				return data ? fn( data ) : fn;
 			}
 		},
+		/*
+		*返回随机字符串
+		*@param {Number} 返回自定的长度的随机字符串 默认是6位
+		*@return {String}
+		*/
 		generateMixed : function(n){
 			var n = n || 6;
 			var chars = ['0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
@@ -181,29 +200,40 @@ var Nex = Nex || (function(win,$){
 			 }
 			 return res;	
 		},
+		/*
+		*返回一个不重复字符串,使用方法同generateMixed
+		*/
 		unique : function(n){
 			var str = Nex.generateMixed(n||6);
 			var aid = str+'-'+Nex.aid++;
 			return aid;	
 		},
+		/*
+		*判断是否数字格式
+		*/
 		isNumber : function(value) {
 			return /^-?(?:\d+|\d{1,3}(?:,\d{3})+)?(?:\.\d+)?$/.test(value) ? true : false;	
 		},
+		/*
+		*检测当前对象是否是Nex类
+		*/
 		isNexConstructor : function(obj){
 			return  $.type(obj) === 'function' && ('_isNexConstructor' in obj)  ? true : false;
 		},
-		/*判断当前对象是否属于nex对象*/
+		/*
+		*检测当前对象是否是Nex实例对象
+		*/
 		isNex : function(obj){
 			return  $.type(obj) === 'object' && ('_isNex' in obj)  ? true : false;
 		},
 		/*
-		* 判断当前对象是否是 xtype 
+		*判断当前对象是否是xtype的对象类型 
 		*/
 		isXtype : function(obj){
 			return ( $._isPlainObject( obj ) && ('xtype' in obj ) )	? true : false;
 		},
 		/*
-		*
+		*检测是否是jquery实例
 		*/
 		isjQuery : function(obj){
 			return $.type(obj) === 'object' && ('_outerWidth' in obj) ? true :　false;	
@@ -214,10 +244,15 @@ var Nex = Nex || (function(win,$){
 			return this.classes[cn];	
 		},
 		addClass : function( n,v ){
-			this.classes[n] = v;	
+			this.classes[n] = v;
 			return this;
 		},
 		_classesPaths : {},
+		/*
+		*动态加载组件时，设置组件路径
+		*@param {String|Object} 组件名|组件和组件路径Map
+		*@param {String} 组件路径
+		*/
 		setClassPath : function(){
 			var self = this,
 				argvs = arguments;
@@ -230,11 +265,23 @@ var Nex = Nex || (function(win,$){
 			}	
 			return self;
 		},
+		/*
+		*获取组件路径
+		*@param {String} 组件名
+		*@return {String} 组件路径
+		*/
 		getClassPath : function( n ){
 			return this._classesPaths[n];	
 		},
+		/*
+		*Nex组件基类包含事件机制
+		*@param 组件名称
+		*@param 设置组件的xtype
+		*@return {NexClass}Nex组件类
+		*/
 		widget : function(name,xtype){
 			var undef,
+				//observe
 				base = function( opt ){
 					var argvs = [].slice.apply(arguments);
 					this.init.apply(this,argvs);	
@@ -270,6 +317,7 @@ var Nex = Nex || (function(win,$){
 			base.fn = base.prototype;
 			
 			base.extend({
+				//标识当前函数是属于Nex类
 				_isNexConstructor : true,
 				puglins : [],
 				puglinsConf : {},
@@ -305,8 +353,11 @@ var Nex = Nex || (function(win,$){
 				},
 				_optionsList : [],
 				setOptions : function( options ){
-					if( $.isPlainObject( options ) ) {
-						this._optionsList.push( options );
+					if( $.isPlainObject( options ) ) {//转化成函数方式
+						var _opts = options;
+						options = function(){
+							return _opts;	
+						}
 					}
 					if( $.isFunction( options ) ) {
 						//方法一 ： 设置的时候确定parent的参数 缺点 如果parent的class做改变时不会更新  不要使用此方法！！
@@ -341,6 +392,9 @@ var Nex = Nex || (function(win,$){
 					opt = this.getDefaults( opt,self || this );
 					return opt;
 				},
+				/*
+				*基础类默认参数
+				*/
 				_def : function(self){ 
 					var self = self || this;
 					return {
@@ -349,6 +403,8 @@ var Nex = Nex || (function(win,$){
 						id : '',
 						_isInit : false,
 						_isResize : false,
+						//设备上下文，慎用
+						context : null,
 						stopOnFalse : true,
 						denyManager : false,//不受Manager管理组件 不建议开启
 						//autoDestroy 自动回收机制 如果Nex在触发检查的时候检查不到当前元素存在时如果开启后就删除当前组件，所以如果你创建的是一个服务那就应该设为false
@@ -444,6 +500,20 @@ var Nex = Nex || (function(win,$){
 				getXType : function(){
 					return xtype;	
 				},
+				setAliasName : function( aliasName ){
+					var self = this;
+					if( aliasName ) {
+						var __psc = Nex.__psc;
+						Nex.__psc = true;
+						var aliasNames = $.trim(aliasName).split(/\s+/g);
+						$.each( aliasNames,function(i,n){
+							Nex.parseSubClass( n,self );
+							Nex.addClass( n,self );
+						} );
+						Nex.__psc = __psc;
+					}	
+					return self;
+				},
 				create : function( opt ){
 					return new this(opt||{});	
 				},
@@ -451,6 +521,7 @@ var Nex = Nex || (function(win,$){
 				
 			});
 			base.fn.extend({
+				//标识当前对象是Nex对象实例
 				_isNex : true,
 				getSuperClassXType : function(){
 					return null;	
@@ -479,6 +550,19 @@ var Nex = Nex || (function(win,$){
 					}
 					
 					self.configs = configs;
+					/*如果参数中有prototype,则当前属性会赋值到当前对象的prototype*/
+					var prototype = configs.prototype;
+					configs.prototype = null;
+					delete configs.prototype;
+					
+					if( prototype && $.isFunction( prototype ) ) {
+						prototype = prototype.call( self,configs );
+					}
+					
+					if( prototype && $._isPlainObject( prototype ) ) {
+						$.extend( self,prototype );	
+					}
+					
 					return self;
 				},
 				init : function(options) {
@@ -491,6 +575,7 @@ var Nex = Nex || (function(win,$){
 					opt.self = self;
 		
 					self._eventLocks = {};
+					self._executeEventMaps = {};
 		
 					opt.id = opt.id || self.getId();
 					
@@ -715,19 +800,49 @@ var Nex = Nex || (function(win,$){
 					var size = opt.maxHeight;
 					return 	self.__getCalcSize(size,1);			
 				},
+				/*
+				*组件参数设置和获取
+				*/
 				C : function(key,value){
 					if( typeof key == 'undefined') {
 						return this.configs;	
 					}
-					if( typeof value == 'undefined') {
+					if( typeof value == 'undefined' && typeof key !== 'object' ) {
 						return this.configs[key];
 					}
 					if( $.isFunction( value ) ) {
 						this.configs[key] = value.call( this,this.configs[key] );	
+					} else if( $.isPlainObject( key ) ) {
+						var conf = key;
+						var opt = this.configs;
+						for (var k in conf) {
+							var newValue = conf[k];
+							var oldValue = opt[k];
+			
+							if ( $.isArray( oldValue ) ) {
+								oldValue.push.apply(oldValue, newValue);
+							} else if ($.isPlainObject( oldValue )) {
+								$.extend( oldValue, newValue)
+							} else {
+								opt[k] = newValue;
+							}
+						}
 					} else {
 						this.configs[key] = value;
 					}
 					return this;
+				},
+				set : function(){
+					return this.C.apply(this,arguments);	
+				},
+				get : function(){
+					return this.C.apply(this,arguments);	
+				},
+				setConfig : function(){
+					return this.C.apply(this,arguments);		
+				},
+				getConfig : function(){
+					return this.C.apply(this,arguments);		
 				},
 				/**
 				 * 模板处理函数(用户自定义模版级别最高,其次模板函数,最后_Tpl中的模版)
@@ -814,7 +929,7 @@ var Nex = Nex || (function(win,$){
 					return html;
 				},
 				/*
-				* 不触发被调用API里的事件(部分函数除外 例如setGridBody,因为里面通过计时器触发)
+				*  调用当前对象里的某个API，但是不会触发里面的事件(部分函数除外例如setGridBody,因为里面事件通过计时器触发)
 				*  @param1 {String} 需要调用的API
 				*  @param2~N 被调用的API参数(可选)
 				*/
@@ -919,7 +1034,7 @@ var Nex = Nex || (function(win,$){
 					}
 					
 					var _e = {
-							scope : !!scope ? scope : self,
+							scope : !!scope ? scope : null,
 							func : func,
 							ext : ext
 						};
@@ -927,6 +1042,9 @@ var Nex = Nex || (function(win,$){
 					var id = event[eventType].push(_e);
 				
 					return id-1;
+				},
+				on : function(){
+					return this.bind.apply(this,arguments);	
 				},
 				/*
 				*同bind 区别在于只执行一次
@@ -1006,6 +1124,9 @@ var Nex = Nex || (function(win,$){
 					}
 					return self;
 				},
+				off : function(){
+					return this.unbind.apply(this,arguments);	
+				},
 				/*
 				* 锁定API
 				*  @method {String} API名
@@ -1054,6 +1175,8 @@ var Nex = Nex || (function(win,$){
 					self._eventLocks = eventLocks;
 					return true;
 				},
+				_eventLocks : {},
+				_executeEventMaps : {},//正在的执行的事件
 				/*
 				* 事件触发
 				*  @eventType {String} 事件名
@@ -1061,11 +1184,12 @@ var Nex = Nex || (function(win,$){
 				*/
 				fireEvent : function(eventType,data){
 					var self = this;
-
 					if( self._denyEvent ) {
 						return;	
 					}
 					var opt = self.configs;
+					
+					var context = opt.context || self;
 					
 					var events = opt.events[eventType];
 					var data = self._undef(data,[]);
@@ -1083,13 +1207,16 @@ var Nex = Nex || (function(win,$){
 						data = [data];
 					}
 					//data = $.isArray( data ) ? data : [data];
-					
 					//添加事件锁
 					var eventLocks = self._eventLocks || {};
 					if( eventLocks[eventType] ) {
 						return;	
 					}
-					eventLocks[eventType] = true;
+					//防止死循环事件
+					if( self._executeEventMaps[eventType] ) {
+						return;	
+					}
+					self._executeEventMaps[eventType] = true;
 					
 					var r = true;
 					if($.isArray(events) ) {
@@ -1097,7 +1224,7 @@ var Nex = Nex || (function(win,$){
 						for(var i=0;i<len;i++) {
 							var _e = events[i];
 							if( $.isPlainObject( _e ) ) {
-								r = _e.func.apply(_e.scope,data);
+								r = _e.func.apply(_e.scope || context,data);
 							} else if( $.isFunction( _e ) ){
 								r = _e.apply(self,data);
 							}
@@ -1109,10 +1236,13 @@ var Nex = Nex || (function(win,$){
 					} else if($.isFunction(events)) {
 						r = events.apply(self,data);
 					}
-					//取消事件锁
-					eventLocks[eventType] = false;
+					
+					self._executeEventMaps[eventType] = false;
 					
 					return r;
+				},
+				fire : function(){
+					return this.fireEvent.apply(this,arguments);	
 				},
 				loadPuglins : function(){
 					var self = this;
@@ -1132,10 +1262,10 @@ var Nex = Nex || (function(win,$){
 								evt = _evt.split('.')[0],
 								ext = _evt.split('.')[1],
 								fn = e[i],
-								context = self;
+								context = null;
 							events[evt] = events[evt] || [];	
 							if( $.isPlainObject( fn ) && !$.isEmptyObject( fn ) ) {
-								context = fn.scope || fn.context || self;	//scope
+								context = fn.scope || fn.context || null;	//scope
 								fn = fn.func || fn.fn || fn.callBack || $.noop;
 								if( $.isFunction(fn) && fn !== $.noop ){
 									//self.bind(x,fn,context);	
@@ -1149,7 +1279,7 @@ var Nex = Nex || (function(win,$){
 								//e[i] = [ e[i] ];//
 								events[evt].push({
 									func : fn,
-									scope : context,
+									scope : null,
 									ext : ext || ''
 								});
 							}	
@@ -1190,7 +1320,7 @@ var Nex = Nex || (function(win,$){
 					}
 					return this.configs.id;	
 				},
-				//获取组建的父级组建
+				//获取组件的父级组件
 				getParent : function(  ){
 					var el = this.getDom(),
 						cmp = null;
@@ -1218,9 +1348,9 @@ var Nex = Nex || (function(win,$){
 					for(var x in opt ) {
 						if( reg.test(x) ) {
 							var fn = opt[x],
-								context = self;
+								context = null;
 							if( $.isPlainObject( fn ) && !$.isEmptyObject( fn ) ) {
-								context = fn.context || fn.scope || self;	
+								context = fn.context || fn.scope || null;	
 								fn = fn.func || fn.fn || fn.callBack;
 							}
 							if( $.isFunction(fn) && fn !== $.noop ){
@@ -1241,7 +1371,12 @@ var Nex = Nex || (function(win,$){
 				isjQuery : function(obj){
 					return Nex.isjQuery( obj );
 				},
-				/*解析xtype 到容器*/
+				/*
+				*解析xtype 到容器
+				*@param {String,Dom} 容器
+				*@param {Array,Nex,Xtype} 组件列表 
+				*@param {Boolean} 内部插入 默认是 后 
+				*/
 				parseItems : function(renderTo,items,after){
 					var self = this,
 						opt = self.configs,
@@ -1302,6 +1437,12 @@ var Nex = Nex || (function(win,$){
 				addComponent :　function( renderTo,items,after ){
 					return this.parseItems( renderTo,items,after );
 				},
+				/*
+				*解析xtype 到容器
+				*@param {Array,Nex,Xtype} 组件列表 
+				*@param {String,Dom} 容器
+				*@param {Boolean} 内部插入 默认是 后 
+				*/
 				renderComponent : function( items,renderTo,after ){
 					return this.parseItems( renderTo,items,after );	
 				},
@@ -1324,35 +1465,103 @@ var Nex = Nex || (function(win,$){
 						Nex.gc();
 					}
 				},
+				/*
+				*移除组件 最好需要重载
+				*/
 				destroy : function( m ){
 					this.removeCmp( m );
 					return this;
 				},
-				_setBodyOverflowHidden : function(){
-					var self = this;
-					var opt = self.configs;
-					if( !opt.resizeOnHidden ) {
-						return;
-					}	
-					/*
-					会有无限调用问题，2014.06.01撤销，原因:
-					如果某个容器宽高 导致浏览器出现滚动条，那么在IE下会无限调用
-					因为IE出现滚动条时会触发resize事件
-					*/
-					/*
-					var _body = $(document.body);
-					var render = $(opt.renderTo);
-					render.addClass('nex-overflow-hidden');
-					_body.addClass('nex-overflow-hidden');
-					setTimeout(function(){
-						_body.removeClass('nex-overflow-hidden');	
-						render.removeClass('nex-overflow-hidden');	
-					},0);
-					*/
-				},
+				//作废
+				_setBodyOverflowHidden : function(){},
 				getDeferred : function(){
 					var opt = this.configs;
 					return opt.deferred;
+				},
+				/*
+				*获取异步数据 必须要加载Nex.Ajax
+				*方式一 通过URL设置
+				*getAsyncData(url[success,error,complete,options]);
+				*success,error,complete {Function}  options {Object}
+				*eg getAsyncData( 'a.json',function( data ){ console.log( data ) },{ dataType:'json' } );
+				*/
+				getAsyncData : function( url ){
+					var self = this,
+						undef,
+						success,
+						error,
+						complete,
+						options,
+						args = [].slice.apply(arguments);	
+					var ins = null;	
+					//参数处理	
+					var len = args.length;
+					for( var i=1;i<len;i++ ) {
+						if( typeof args[i] === 'object' ) {
+							options = args[i];
+							break;	
+						}
+						if( typeof args[i] === 'function' ){
+							switch( i ) {
+								case 1:
+									success = args[1];
+									break;
+								case 2:
+									error = args[2];
+									break;
+								case 3:
+									complete = args[3];
+									break;		
+							}
+						}
+					}	
+					//url的处理方式	
+					if( $.type( url ) === 'string' ) {
+						var obj = {
+								xtype : 'ajax',
+								url : url,
+								context : self
+							};
+						if( options ) {
+							$.extend( obj,options );	
+						}
+						if( success ) {
+							obj['onSuccess.__async'] = success;
+						}
+						if( error ) {
+							obj['onError.__async'] = error;
+						}
+						if( complete ) {
+							obj['onComplete.__async'] = complete;
+						}
+						ins = Nex.Create( obj );
+					} else if( $.type( url ) === 'function' ) {//用户自定义函数处理方式
+						var _data = url.call(self,options,success,error,complete);
+						if( _data !== undef ) {
+							success( _data );	
+							complete();
+						}	
+					} else if( typeof url === 'object' ) {
+						var obj = {
+							xtype : 'ajax'	
+						};
+						if( !Nex.isXtype( url ) ) {
+							$.extend( obj,url )	
+						} else {
+							obj = url;	
+						}
+						if( success ) {
+							obj['onSuccess.__async'] = success;
+						}
+						if( error ) {
+							obj['onError.__async'] = error;
+						}
+						if( complete ) {
+							obj['onComplete.__async'] = complete;
+						}
+						ins = Nex.Create( obj );
+					}
+					return ins;
 				},
 				//ajax api
 				loadData : function(url,data,options){//loader
@@ -1363,7 +1572,7 @@ var Nex = Nex || (function(win,$){
 				}
 			});
 			return base;
-		}	,
+		},
 		//数组移动算法
 		// pos 要移动的元素
 		array_move : function(iarr,pos,target,t) {//t 代表是前还是后 1 代表前 0 代表后
@@ -1611,7 +1820,7 @@ var Nex = Nex || (function(win,$){
 			}
 		},
 		/*判断是否出现滚动条*/
-		hasScroll: function( el, a ) {
+		hasScroll: function( el, a, t ) {
 			
 			var el = $(el)[0];//el 是dom
 			
@@ -1622,14 +1831,16 @@ var Nex = Nex || (function(win,$){
 				return false;
 			}
 			*/
-			if( a === "left" ) {
-				if ( $( el ).css( "overflow-x" ) === "hidden") {
-					return false;
+			if( t !== true ) {
+				if( a === "left" ) {
+					if ( $( el ).css( "overflow-x" ) === "hidden") {
+						return false;
+					}
+				} else {
+					if ( $( el ).css( "overflow-y" ) === "hidden") {
+						return false;
+					}	
 				}
-			} else {
-				if ( $( el ).css( "overflow-y" ) === "hidden") {
-					return false;
-				}	
 			}
 			var scroll = ( a && a === "left" ) ? "scrollLeft" : "scrollTop",
 				has = false;
@@ -1643,6 +1854,22 @@ var Nex = Nex || (function(win,$){
 			has = ( el[ scroll ] > 0 );
 			el[ scroll ] = 0;
 			return has;
+		},
+		//工具集合
+		util : {},
+		addUtil : function(n,v){
+			return this.util[n] = v;	
+		},
+		getUtil : function(n){
+			return this.util[n];	
+		},
+		extendUtil : function(n,v){
+			return $.extend( this.util[n],v );
+		},
+		removeUtil : function(){
+			this.util[n] = null;
+			delete this.util[n];
+			return this;
 		},
 		/*直接使用jquery 的Deferred对象 所以要使用when需要确定jquery版本支持Deferred*/
 		when : function(){
@@ -1673,13 +1900,21 @@ var Nex = Nex || (function(win,$){
 				}	
 			});	
 		},
+		/*
+		*__psc=true
+		*parseSubClass会把字符串直接转成对象
+		*__psc=false
+		*如果分割长度少于2则会把对象存放到Nex下
+		*eg：parseSubClass('Test',5);__psc=true后会直接创建Test否则Nex.Test
+		*/
+		__psc : true,
 		//把字符串转化成对象 并复制v
 		parseSubClass : function(str,v){
 			var undef,
 				t = window,
 				s = str+'';	
 			s = s.split('.');
-			if( s.length<2 ) {
+			if( s.length<2 && !this.__psc ) {
 				return;	
 			}
 			for( var i=0,len=s.length-1;i<len;i++ ) {
@@ -1705,17 +1940,24 @@ var Nex = Nex || (function(win,$){
 			if( subclass === 'Nex' ) {
 				return 	Nex.widget();
 			}
+			var notExist = false;
 			//如果不存在superClass 直接返回
 			if( !superClass ) {
 				superClass = Nex.widget();
+				notExist = true;
 				//Nex.parseSubClass( subclassName,subclass );
 				//return subclass;
 			}
-			
+			//mixins
 			//检查是否没设置overrides
 			if( $._isPlainObject( superClass ) ) {
 				overrides = superClass;	
 				superClass = false;
+				if( 'extend' in overrides && overrides.extend ) {
+					superClass = overrides.extend;
+					superClass = true;
+					delete overrides.extend;
+				}
 			}
 			if( Nex.isNexConstructor( superClass ) ) {
 				
@@ -1728,7 +1970,10 @@ var Nex = Nex || (function(win,$){
 			} else {
 				//superClass = false;	
 				superClass = Nex.widget();
+				notExist = true;
 			}
+			
+			superClassName = notExist ? null : superClass.getXType();
 			
 			subclass = Nex.widget(subclass);
 			//只复制数组和(浅复制)对象
@@ -1755,8 +2000,32 @@ var Nex = Nex || (function(win,$){
 				subclass.superclass = superClass;
 			}
 			
+			var aliasName,configs,xtype;
+			if( 'alias' in overrides && overrides.alias ) {
+				aliasName = overrides.alias+'';
+				delete overrides.alias; 	
+			}
+			if( 'configs' in overrides && overrides.configs ) {
+				configs = overrides.configs;
+				delete overrides.configs; 	
+			}
+			
+			if( 'xtype' in overrides && overrides.xtype ) {
+				xtype = overrides.xtype+'';
+				delete overrides.xtype; 
+			}
+			
+			if( 'mixins' in overrides && overrides.mixins ) {
+				overrides.mixins = $.isArray( overrides.mixins ) ? overrides.mixins : [overrides.mixins];
+				$.each( overrides.mixins,function(i,d){
+					$.extend( overrides,d );	
+				} );
+				overrides.mixins.length = 0;
+				delete overrides.mixins;
+			}
+			
 			for( var m in overrides ) {
-				subclass.prototype[m] = overrides[m];	
+				subclass.prototype[m] = copy(overrides[m]);	
 			}
 			
 			//清空父级的配置参数
@@ -1764,10 +2033,10 @@ var Nex = Nex || (function(win,$){
 			
 			/*getSuperClassXType设置*/
 			subclass.prototype['getSuperClassXType'] = function(){
-				return superClass ? superClassName : null;
+				return superClassName;
 			};	
 			subclass['getSuperClassXType'] = function(){
-				return superClass ? superClassName : null;
+				return superClassName;
 			};	
 			/*getXType设置*/
 			subclass.prototype['getXType'] = function(){
@@ -1775,7 +2044,7 @@ var Nex = Nex || (function(win,$){
 			};	
 			subclass['getXType'] = function(){
 				return subclassName;
-			};		
+			};
 
 			subclass.prototype.constructor = subclass;
 			subclass.constructor = subclass;
@@ -1783,7 +2052,27 @@ var Nex = Nex || (function(win,$){
 			subclass.fn = subclass.prototype;
 			//设置一个全局变量
 			Nex.parseSubClass( subclassName,subclass );
-		
+			
+			if( aliasName ) {
+				var __psc = Nex.__psc;
+				Nex.__psc = true;
+				var aliasNames = $.trim(aliasName).split(/\s+/g);
+				$.each( aliasNames,function(i,n){
+					Nex.parseSubClass( n,subclass );
+					Nex.addClass( n,subclass );
+				} );
+				Nex.__psc = __psc;
+			}
+			if( xtype ) {
+				var xtypes = $.trim(xtype).split(/\s+/g);
+				$.each( xtypes,function(i,t){
+					subclass.setXType(t);		
+				} );
+			}
+			if( configs ) {
+				subclass.setOptions(configs);		
+			}
+			
 			return subclass;
 		},
 		define : function(){
@@ -1911,6 +2200,8 @@ Nex._Manager.fn.extend({
 		if( cmp && cmp.C('autoDestroy') ) {
 			self.removeCmp(id);	
 		}
+		//如果组件找不到dom 那么就从resize列表移除
+		delete self._cmps[id];	
 		return false;
 	},
 	_getDomComps : function( el ){

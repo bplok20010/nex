@@ -40,12 +40,12 @@
 			Define('e','e');
 			Define(['q'],function(e){
 				console.log('q');
-				exports('r');	
+				//exports('r');	
 				Define('r','r')
 			});
 			Define(['r'],function(r){
 				console.log(r);
-				exports('t');	
+				//exports('t');	
 			});
 			$( function(){
 				Nex.setLoaderShims('a',['b']);

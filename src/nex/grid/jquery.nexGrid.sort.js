@@ -12,6 +12,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 	"use strict";
 	//参数
 	$.nexGrid.addExtConf({
+							sortable : true,//全局开关
 							pageSort : false,//只对当前页做排序
 							sortName : '',
 							sortOrder : 'asc'
@@ -44,6 +45,11 @@ email:zere.nobo@gmail.com or QQ邮箱
 				gid = opt.gid;
 			var field = field || false;
 			if(field == false) return;
+			
+			if( !opt.sortable ) {
+				return;	
+			}
+			
 			//设置列是否可排序
 			var sortable = self.getColumnData(field,'sortable');
 			if( !sortable ) {

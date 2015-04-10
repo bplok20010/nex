@@ -9,12 +9,24 @@
 	$.extend( Nex,{
 		__loader : null,
 		_getLoader : function(){
-			var self = this;
+			var self = this,undef;
 			if( !self.__loader ) {
 				self.__loader = Nex.Create('Nex.Loader',{
 					autoLoad : false,
-					splitChr : true,
 					loadOrder : false,
+					cjsRequireRegExp : /[^.]\s*(?:Require|\$require|Nex\.use|Nex\.require)\s*\(\s*["']([^'"\s]+)["']\s*\)/g,
+					exportsName : '_export',
+					exportsApi : '$exports Exports',
+					includeApi : '$require Require',
+					defineApi : '$define Define',
+					'onBeforeParseScriptName.require' : function( name,moduleName,opt ){
+						var classPath = Nex.getClassPath( name );
+						if( classPath )	{
+							classPath = classPath + '';
+							classPath = classPath.split('.').join('/');
+							opt.currScriptName = classPath;
+						}
+					},
 					'onBeforeLoadScript.require' : function( deps,opt ){
 						var loader = this;
 						$.each( deps,function(i,v){
@@ -25,14 +37,20 @@
 							}		
 						} );
 					},
+					'onRequireModule.require' : function( deps,exports,opt ){
+						if( !(deps in exports) || exports[deps] === undef ) {
+							if( Nex.getClass( deps ) ) {
+								exports[ deps ] = Nex.getClass( deps );	
+							}	
+						}	
+					},
 					nex : Nex.baseUrl
 				});
 				if( !self.__loader ) {
 					return null;	
 				}
 				self.__loader.setPath('baseUrl',Nex.baseUrl)
-							 .setPath('Nex',Nex.baseUrl)
-						     .setPath('nex',Nex.baseUrl);
+							 .setPath('Nex',Nex.baseUrl);
 			}
 			return self.__loader;
 		},
@@ -73,6 +91,18 @@
 		setLoaderAlias : function(){
 			return this.requireAlias.apply( this,arguments );	
 		},
+		requireShims : function(n,v){
+			var self = this;
+			var loader = self._getLoader();
+			if( !loader ) {
+				return this;	
+			}
+			loader.setShims.apply(loader,arguments);
+			return this;	
+		},
+		setLoaderShims : function(){
+			return this.requireShims.apply( this,arguments );	
+		},
 		/*
 		*加载组件或脚本
 		*如果加载的是组件 则 如果组件存在则不会加载 如果你加载的是组件，名称一定要对上
@@ -84,9 +114,21 @@
 			var loader = this._getLoader();
 			return loader.require( deps,callback,errback );
 		},
+		use : function(){
+			var loader = this._getLoader();
+			return loader.require.apply( loader,arguments );	
+		},
+		module : function(){
+			var loader = this._getLoader();
+			return loader.define.apply( loader,arguments );	
+		},
 		include : function(deps,callback,errback){
 			var loader = this._getLoader();
 			return loader.require( deps,callback,errback );
+		},
+		exports : function(o){
+			var loader = this._getLoader();
+			return loader.exports( o );	
 		},
 		setLoaderOptions : function(){
 			var loader = this._getLoader();
@@ -94,6 +136,13 @@
 				loader.C.apply( loader,arguments );	
 			}	
 			return this;
+		},
+		getLoaderOptions : function(){
+			var loader = this._getLoader();
+			if( loader ) {
+				return loader.C.apply( loader,arguments );	
+			}	
+			return null;	
 		}
 	} );
 	Loader.extend({
@@ -114,22 +163,24 @@
 				debug : false,
 				strictDeps : true,//严格依赖 如果依赖加载失败就不会执行回调
 				commentRegExp : /(\/\*([\s\S]*?)\*\/|([^:]|^)\/\/(.*)$)/mg,
-       			cjsRequireRegExp : /[^.]\s*[require|include]\s*\(\s*["']([^'"\s]+)["']\s*\)/g,
-				exportsName : '_export',//无效 做导出用 最好是没创建一个Loader exportsName都应该设置不同 因为在IE下会有onload 通知不及时问题
-				exportsApi : 'exports',//全局导出api 最好用这个因为支持IE
-				includeApi : 'require include define',//全局加载api 
+       			cjsRequireRegExp : /[^.]\s*(?:\$require|\$include)\s*\(\s*["']([^'"\s]+)["']\s*\)/g,
+				exportsName : '_$export',// 做导出用 最好是没创建一个Loader exportsName都应该设置不同 因为在IE下会有onload 通知不及时问题
+				exportsApi : '$exports',//全局导出api 最好用这个因为支持IE
+				includeApi : '$require $include',//全局加载api 
+				defineApi : '$define',
 				head : document.getElementsByTagName('head')[0] ||  document.documentElement,
 				checkExt : true,//自动检查后缀 并添加.js
-				checkExtReg : /(\.css|\.js)$/,
-				splitChr : true,//会把.分割成"." eg : Nex.Html Nex/Html
-				loadType : '',//加载类型 可以指定css js img
+				checkExtReg : /(\.css|\.js|\.php|\.jsp|\.py|\.txt|\.htm|\.html|\.php4|\.php5|\.php3|\.do|\.asp|\.aspx)$/,
+				loadTypeName : 'loadType',//url loadType参数
+				loadType : '',//自定义加载方法 func 或者指定api来加载
 				defaultExt : '.js',
 				baseUrl : '',
-				loadOrder : true,//是否按顺序加载脚本(串联加载，阻塞加载) 默认 true  并联加载(非阻塞) false
+				loadOrder : false,//是否按顺序加载脚本(串联加载，阻塞加载) 默认 false 
 				scriptType : 'text/javascript',
 				charset : 'utf-8',
 				items : [],
 				_list : [],//缓存list
+				loadQueues : [],
 				_loadCache : {},//判断是否加载ok
 				module2path : {},//路径对应模块 
 				currScriptAliasName : null,
@@ -143,6 +194,7 @@
 				paths : {},//路径别名 eg:{ app:'lib/app' } items使用 {{app}}/a.js
 				alias : {},//加载别名 eg:{ nex : '{{app}}/nex.js' }
 				param : {},
+				shim : {},//依赖机制
 				template : Loader.template,
 				autoLoad : false,//初始化后自动加载
 				//pending : null,
@@ -176,6 +228,25 @@
 				return true;	
 			}
 			return false;
+		},
+		/*
+		*获取导出对象
+		*/
+		getExports : function( name ){
+			var self = this,undef;
+			var exports = this.exports;
+			
+			if( name === undef ) {
+				return exports;	
+			}
+			
+			if( !(name in exports) || exports[name] === undef ) {
+				if( Nex.getClass( name ) ) {
+					exports[ name ] = Nex.getClass( name );	
+				}	
+			}		
+			
+			return exports[ name ];
 		},
 		/*
 		*设置模块加载缓存 
@@ -238,12 +309,17 @@
 			
 			$.each( opt.includeApi.split(/\s+/),function(i,v){
 				window[v] = function(){
-					self.require.apply( self,arguments );	
+					return self.require.apply( self,arguments );	
 				};	
 			} );
 			$.each( opt.exportsApi.split(/\s+/),function(i,v){
 				window[v] = function(){
-					self.exports.apply( self,arguments );	
+					return self.exports.apply( self,arguments );	
+				};	
+			} );
+			$.each( opt.defineApi.split(/\s+/),function(i,v){
+				window[v] = function(){
+					return self.define.apply( self,arguments );	
 				};	
 			} );
 			
@@ -265,17 +341,21 @@
 			
 			return self;
 		},
-		
+		getExports : function( name ){ 
+			return Nex.Loader.getExports( name );
+		},
 		_checkLoad : function(){
 			var self = this,
 				opt = self.configs;
-			
+				
+			self._checkLoad1();		
+			/*
 			if( opt.loadOrder ) {
 				self._checkLoad2();	
 			} else {
 				self._checkLoad1();	
 			}	
-			
+			*/
 			return self;
 		},
 		//回调实现方式1 ，等所有脚本加载完后才执行 适合所有模式
@@ -295,6 +375,10 @@
 						//return false;
 					}					 
 				} );
+				//如果严格模式下 当前模块应该是没有加载成功
+				if( opt.strictDeps && !isSuccess ) {
+					Nex.Loader.unsetLoadCache( data.moduleName );
+				}
 				isSuccess = opt.strictDeps ? isSuccess : true;
 				if( isSuccess ) {
 					if( $.isFunction( data.callBack ) ) {
@@ -312,6 +396,7 @@
 			
 			return self;
 		},
+		//以废弃
 		//回调实现方式2 ，依赖加载完后就执行 ,虽然实现会更复杂，但却更符合逻辑
 		//只适合loadOrder
 		_checkLoad2 : function(){
@@ -337,6 +422,10 @@
 						//return false;
 					}					 
 				} );
+				//如果严格模式下 当前模块应该是没有加载成功
+				if( opt.strictDeps && !isSuccess ) {
+					Nex.Loader.unsetLoadCache( data.moduleName );
+				}
 				isSuccess = opt.strictDeps ? isSuccess : true;
 				//如果loadOrder模式下没有完成 那么后面的也不用检查了
 				if( complete ) {
@@ -426,6 +515,24 @@
 			return self;
 		},
 		/*
+		*设置强制依赖
+		*@param string 需要加载的脚本
+		*@param string 强制依赖的脚本
+		*/
+		setShims : function(/* name,value */){
+			var self = this,
+				argvs = arguments,
+				opt = this.configs;
+			if( argvs.length === 1 && $.isPlainObject( argvs[0] ) ) {
+				$.extend( opt.shim,argvs[0] );	
+			} else {	
+				if( argvs[0] && argvs[1] ) {
+					opt.shim[argvs[0]] = argvs[1];
+				}	
+			}
+			return self;
+		},
+		/*
 		*脚本加载失败时调用
 		*@param object 事件对象
 		*@param func 成功后调用
@@ -481,12 +588,12 @@
 				errDeps = [],
 				success = true;	
 			//有2中checkLoad机制检查	
-			if( opt.loadOrder ) {
-				self._checkLoad();	
-			}	
+			//if( opt.loadOrder ) {
+//				self._checkLoad();	
+//			}	
 			
-			this.fireEvent('onProgress',[ self.getProgress(),_currName,opt ]);	
 			this.fireEvent('onLoadScriptComplete',[_currName,opt]);	
+			this.fireEvent('onProgress',[ self.getProgress(),_currName,opt ]);	
 			
 			for( var k in cache ) {
 				if( !self._isLoadScript(cache[k]) ) {
@@ -494,13 +601,27 @@
 					break;	
 				}
 			}
+			
+			if( opt.loadOrder ) {
+				if( opt.loadOrder && $.isFunction(c) ) {
+					c();
+				}
+			} else {
+				if( complete ) {
+					self._clearLoadCache();	
+				}
+			}
+			
 			if( complete ) {
 				//清空
 				opt.items.length = 0;	
 				//有2中checkLoad机制检查
-				if( !opt.loadOrder ) {
-					self._checkLoad();	
-				}
+				//if( !opt.loadOrder ) {
+//					self._checkLoad();	
+//				}
+				//选择机制1 ，所有脚本加载后才执行
+				self._checkLoad();
+				
 				for( var k in cache ) {
 					if( cache[k]===false ) {
 						success = false;
@@ -523,15 +644,6 @@
 				self.fireEvent('onComplete',[successDeps,errDeps,opt]);	
 			}	
 			
-			if( opt.loadOrder ) {
-				if( opt.loadOrder && $.isFunction(c) ) {
-					c();
-				}
-			} else {
-				if( complete ) {
-					self._clearLoadCache();	
-				}
-			}
 			return self;
 		},
 		/*
@@ -633,14 +745,24 @@
 			 	 if($.isFunction(s)) {
 					 s();	
 			 	 }
+				Nex.Loader._loadCache[ _currName ] = true;
+				self.fireEvent('onLoadScriptSuccess',[_currName,opt]);
 			  	self.onScriptComplete(complete,_currName);
+				if( !opt.loadOrder ) {
+					self._load();	
+				}
 			}, 1);
-			
-			if( !opt.loadOrder ) {
+			/*if( !opt.loadOrder ) {
 				complete();
-			}
+			}*/
 			
 			return node;
+		},
+		/*
+		*获取模块加载顺序
+		*/
+		getLoadQueues : function(){
+			return this.configs.loadQueues.reverse();	
 		},
 		/*
 		*开始加载脚本
@@ -669,7 +791,7 @@
 				if( opt._list[i] === '' ) continue;
 				opt._loadCache[opt._list[i] + ''] = null;
 			}
-				
+			opt.loadQueues.length = 0;	
 			self._load();
 			return self;
 		},
@@ -736,8 +858,9 @@
 			return script;
 		},
 		//扩展用
-		loadExtension : function(){
-			return null;	
+		loadExtension : function(name,success,error,_currName){
+			var self = this;
+			return self.loadScript( name,success,error,_currName );	
 		},
 		/*
 		*判断模块是否已经加载
@@ -767,6 +890,48 @@
 		clearLoadCache : function(){
 			return Nex.Loader.clearLoadCache();	
 		},
+		_getShim : function( moduleName ){
+			var self = this,
+				undef,
+				opt = this.configs,
+				deps = [];
+			
+			var modules = $.isArray( moduleName ) ? moduleName : [moduleName];
+			$.each( modules,function( i,n ){
+				var shim = opt.shim[ n ] === undef ? "" : opt.shim[ n ];
+				if( shim ) {
+					shim = $.isArray( shim ) ? shim : [shim];	
+				} else {
+					shim = [];	
+				}
+				deps.push.apply( deps,shim );
+			} );
+			
+			//清除为空的模块或者以及加载的模块
+			Nex.array_splice( function(i,v){
+				if( $.trim( v ) === '' ) return true;	
+				if( Nex.Loader._loadCache[v] === true || Nex.Loader._loadCache[v] === false ) {
+					return true;	
+				}
+			},deps );
+			
+			return deps;	
+		},
+		_addDeps : function( deps ){
+			var self = this,
+				undef,
+				opt = this.configs;
+				
+			$.each( deps,function(i,d){
+				if( !(d in opt._loadCache) ) {
+					opt._loadCache[d + ''] = null;
+				}
+			} );
+			
+			Nex.array_insert( 0,deps,opt._list,1 );
+			
+			return self;
+		},
 		/*
 		*加载单个脚本
 		*因为需要加载的文件都会存入一个堆栈(后进先出) 文件加载成功后都会出堆 直到堆栈为空则停止
@@ -774,7 +939,8 @@
 		_load : function(){
 			var self = this,
 				undef,
-				opt = this.configs;
+				opt = this.configs,
+				ext = opt.defaultExt.replace('.',"");
 			
 			if( !opt.loadOrder && self.isAllPending() ) {
 				return self;	
@@ -788,51 +954,99 @@
 			}
 			
 			var _currName = self.getNextLoadScript();
+			
 			_currName = _currName + '';
 			var name = _currName;
 			opt.currScriptAliasName = name;
-	
+			
 			if( name in opt.alias ) {
 				name = opt.alias[name];	
 			} else {
 				name = opt.baseUrl + name;	
 			}
-			//判断是否需要把"."替换成"/"
-			if( opt.splitChr ) {
-				var chr = opt.splitChr === true ? '.' : opt.splitChr;
-				name = name.split( chr ).join('/');
-			}
 			
-			name = name.split('/');
-			$.each( name,function(i,d){
-				if( d in opt.paths ) {
-					name[i] = opt.paths[d];	
-				}					  
-			} );
-			name = name.join('/');
-			
-			try{
-				name = opt.template.compile( name,opt.paths );
-			} catch(e) {}
-			
-			//检测如果最后没有.css .js 会自动加上
-			if( opt.checkExt && !opt.checkExtReg.test( name ) ) {
-				name += opt.defaultExt;	
+			function getScriptExt(url){
+				var _url = url;
+				
+				url = url.replace(/[?#].*/, "");
+				
+				if( /\.css$/i.test( url ) ) {
+					return 'css';
+				}
+				if( /\.js$/i.test( url ) ) {
+					return 'js';
+				}
+				
+				/*var reg = /\.([^\.]+)$/ig;
+				var exts = reg.exec( url );
+				if( $.isArray(exts) && exts.length ) {
+					return exts[0].replace(".","");	
+				}*/
+				
+				if( /\.css$/i.test( _url ) ) {
+					return 'css';
+				}
+				if( /\.js$/i.test( _url ) ) {
+					return 'js';
+				}
+				
+				return '';
 			}
 			
 			opt.currScriptName = name;//当前脚本名
 			
-			self.fireEvent('onParseScriptName',[ name,opt ]);
+			opt.loadQueues.push( _currName );
+			
+			var r = self.fireEvent('onBeforeParseScriptName',[ name,_currName,opt ]);
 			
 			name = opt.currScriptName;
+			
+			if( r !== false ) {
+				
+				name = name.split('/');
+				if( name[0] === '.' && name[1] !=='' ) {
+					if( name[1] in opt.paths ) {
+						name[1] = opt.paths[name[1]];	
+					}	
+					name.splice(0,1);
+				}
+				if( name[0] !== '..' && name[0] !== '' ) {
+					if( name[0] in opt.paths ) {
+						name[0] = opt.paths[name[0]];	
+					}	
+				}
+				name = name.join('/');
+				
+				try{
+					name = opt.template.compile( name,opt.paths );
+				} catch(e) {}
+				
+				var _ext = getScriptExt( name );
+				//检测如果最后没有.css .js .php 会自动加上默认后缀
+				if( opt.checkExt && !opt.checkExtReg.test( name ) && !_ext ) {
+					name += opt.defaultExt;	
+				}
+				
+				opt.currScriptName = name;//当前脚本名
+				
+				self.fireEvent('onParseScriptName',[ name,_currName,opt ]);
+				
+				name = opt.currScriptName;
+			}
+			
+			ext = getScriptExt( name ) || 'js';
 			
 			var success = function(){
 				var name = _currName;
 				opt._loadCache[name] = true;	
 				
 				if( !Nex.isIE ) {//如果不是IE 保存导出对象
-					Nex.Loader.exports[ name ] =  $.isPlainObject( window[opt.exportsName] ) && $.isEmptyObject( window[opt.exportsName] ) ? undef : window[opt.exportsName];	
+					var ep = $.isPlainObject( window[opt.exportsName] ) && $.isEmptyObject( window[opt.exportsName] ) ? undef : window[opt.exportsName];
+					if( ep ) {
+						Nex.Loader.exports[ name ] =  ep;
+					}
 					window[opt.exportsName+'CallBack']['moduleName'] = name;
+					//window[opt.exportsName+'CallBack'] = {};
 				}
 				
 				self.resetExports();
@@ -840,12 +1054,18 @@
 			var error = function(){
 				var name = _currName;
 				opt._loadCache[name] = false;	
+				//window[opt.exportsName+'CallBack'] = {};
 			};
-			
 			
 			var query = $.param( opt.param );
 			if( query ) {
 				query = name.indexOf('?') === -1 ? '?'+query : '&'+query;
+			}
+			
+			//再次获取扩展名 以确定调用对应的扩展函数加载
+			var extReg = new RegExp( opt.loadTypeName+'=[^&]+','ig' );
+			if( $.isArray( extReg ) && extReg.length ) {
+				ext = extReg.pop().replace('.','');
 			}
 			
 			name = opt.currScriptName = $.trim(name + query);
@@ -860,28 +1080,41 @@
 			  ) {
 				cache = true;
 			}
-
+			
 			if( cache ) {
+				opt._loadCache[_currName] = true;//必须
 				self.fireEvent('onLoadScriptSuccess',[_currName,opt]);
-				setTimeout( function(){
-					self.onScriptComplete( function(){
-						self._load();	
-					},_currName );
-				},1 );
+				
+				self.onScriptComplete( function(){
+					self._load();	
+				},_currName );
+				
+				if( !opt.loadOrder ) {
+					self._load();	
+				}
 				return self;
 			}
 			
 			//设置默认值 这一步或许不必要 但是按理来说都应该有导出模块 只是默认是{}
 			//Nex.Loader.exports[ _currName ] = {};
-			
+			//首字母大写
+			function replaceReg(reg,str){
+				str = str.toLowerCase();
+				return str.replace(reg,function(m){return m.toUpperCase()})
+			}
 			if( !opt.loadType ) {
 				//加载css
-				if( /\.css$/i.test( name ) ) {
+				if( ext === 'css' ) {
 					self.loadCss( name,success,error,_currName );	
-				} else if( /\.js$/i.test( name ) ) {//加载js
+				} else if( ext === 'js' ) {//加载js
 					self.loadScript( name,success,error,_currName );		
 				} else {
-					self.loadExtension( name,success,error,_currName );		
+					var method = 'load'+replaceReg( /\b(\w)|\s(\w)/g,ext );
+					if( (method in self) && $.isFunction( self[method] ) ) {
+						self[method].call( self,name,success,error,_currName );
+					} else {
+						self.loadExtension( name,success,error,_currName );		
+					}
 				}
 			} else {
 				if( $.isFunction( opt.loadType ) ) {
@@ -897,22 +1130,106 @@
 			
 			return self;
 		},
+		//取消加载
+		abort : function(){
+			var self = this,
+				undef,
+				errDeps = [],
+				successDeps = [],
+				opt = this.configs,
+				cache = opt._loadCache,
+				pendings = [], //正在加载的脚本
+				_pendings = {}
+				;
+			for( var k in cache ) {
+				if( cache[k]===false ) {
+					success = false;
+					errDeps.push( k );
+				} else if( cache[k]===true ) {
+					successDeps.push( k );
+				} else if( cache[k]==='pending' ) {
+					pendings.push( k ); 
+					_pendings[k] = true;	
+				}
+			}	
+			if( pendings.length ) {
+				opt._isAbort = true;
+				var eid,eid2;
+				eid = self.bind('onLoadScriptComplete._abort',function(module){
+					_pendings[ module ] = false;
+					var end = true;
+					$.each( _pendings,function(k,v){
+						if( v ) {
+							end = false;
+							return false;	
+						}	
+					} );
+					if( end ) {
+						opt._isAbort = false;	
+						self.unbind('onLoadScriptComplete',eid);	
+						self.unbind('onBeforeLoadScript',eid2);	
+					}
+				});	
+				eid2 = self.bind('onBeforeLoadScript._abort',function(list,fn,errback){
+					var currExports = Nex.isIE ? self.getInteractiveName() : null;
+					$.each( list,function(i,m){
+						cache[m] = false;	
+					} );
+					if( $.isFunction(fn) ) {
+						var exports = list.concat([]);
+						window[opt.exportsName+'CallBack'] = {
+							moduleName : currExports,
+							deps : exports,
+							errBack : errback,
+							callBack : function(){
+								var argvs = [];
+								$.each( this.deps,function(i,v){
+									//argvs.push( Nex.Loader.exports[v] );				
+									argvs.push( self.getExports( v ) );				  
+								} );
+								argvs.push( window[opt.exportsName] );
+								fn.apply(self,argvs);	
+								var ep = $.isPlainObject( window[opt.exportsName] ) && $.isEmptyObject( window[opt.exportsName] ) ? undef : window[opt.exportsName];
+								//如果模块存在 执行回调 并且回调里面的exports保持到当前模块中
+								if( this.moduleName ) {//&& !( this.moduleName in Nex.Loader.exports ) 
+									Nex.Loader.exports[ this.moduleName ] = ep;	//window[opt.exportsName];	
+								}
+								//清空exports
+								self.resetExports();
+							}
+						};
+						Nex.array_insert( 0,[ window[opt.exportsName+'CallBack'] ],self.__loaderCallBack,1 );
+					}
+					return false;	
+				});
+			}
+			$.each( opt._list,function(i,m){
+				if( cache[m] === null ) cache[m] = false;	
+			} );
+			self.fireEvent('onAbort',[opt]);	
+			return self;
+		},
 		/*
 		*加载脚本
 		*@param {Array} 组件列表 eg ['Nex.Ajax','Nex.Html']
 		*@param {func} 回调
 		*/
-		"load" : function( list,fn,errback ){//deps,callback,errback
+		"load" : function( list,fn,errback,module ){//deps,callback,errback
 			var self = this,
 				undef,
 				opt = this.configs;
-			
+		
 			var r = self.fireEvent('onBeforeLoadScript',[list,fn,errback,opt]);
 			if( r === false ) return self;
+			
+			if( $.type( errback ) === 'string' && module === undef ) {
+				module = errback;
+				errback = undef;
+			}
 				
 			//由于IE的onload事件回调不准确，我们只能在执行脚本的时候 确定当前执行的脚本名称
 			var currExports = Nex.isIE ? self.getInteractiveName() : null;
-
+			
 			if( list !== undef ) {	
 				list = $.isArray( list ) ? list : [ list ];	
 			} else {
@@ -924,42 +1241,112 @@
 				list.push.apply( list,_deps );
 			}
 			
-			//清除为空的模块
-			Nex.array_splice( function(i,v){
-				if( $.trim( v ) === '' ) return true;	
-			},list );
+			var exports = list.concat([]);
 			
-			if( !list.length && $.isFunction(fn) ) {
-				fn();
-				return self;
+			//如果有强制依赖 就检测是否有多级依赖
+			var checkCircle = {};//检测环形回路 暂时没有处理
+			var shimDeps = [];
+			function checkToShimLoad( deps ){
+				var _shimLoadCache={},
+					eid,
+					//是否有强制依赖
+					nlist = [];
+				$.each( deps,function(i,m){
+					var shims = self._getShim( m );	
+					if( shims.length ) {
+						nlist.push.apply( nlist,shims );	
+						$.each( shims,function(i,d){
+							checkCircle[d] = true;
+							_shimLoadCache[d] = false;	
+						} )
+					}
+				} );
+				//简单检测一下
+				/*Nex.array_splice(function(i,d){
+					if( checkCircle[d] ) {
+						return true;	
+					}	
+				},nlist);*/
+				
+				if( nlist.length ) {
+					list = nlist;
+					shimDeps = nlist;
+					var eventType = opt.strictDeps ? 'onLoadScriptSuccess' : 'onLoadScriptComplete';
+					eid = self.bind( eventType+'._load',function( m ){
+						_shimLoadCache[m] = true;
+						var complete = true;
+						$.each( _shimLoadCache,function(m,r){
+							if( !r ) {
+								complete = false;
+								return false;	
+							}		
+						} );
+						if( complete ) {
+							self._addDeps( deps );
+							self.load( deps );
+							self.unbind( eventType,eid );	
+						}
+					} );
+					checkToShimLoad( nlist );
+				}	
 			}
+			//检测是否设置了shim 强依赖
+			if( list.length ) {
+				checkToShimLoad( list );	
+				//清除为空的模块
+				Nex.array_splice( function(i,v){
+					if( $.trim( v ) === '' ) return true;	
+				},list );
+				Nex.array_splice( function(i,v){
+					if( $.trim( v ) === '' ) return true;	
+				},exports );
+			}
+			
 			if( $.isFunction(fn) ) {
-				var exports = list.concat([]);
 				window[opt.exportsName+'CallBack'] = {
+					loader : self,
 					moduleName : currExports,
+					_module : module,//显示定义的模块名称
 					deps : exports,
 					errBack : errback,
 					callBack : function(){
 						var argvs = [];
-						$.each( exports,function(i,v){
-							argvs.push( Nex.Loader.exports[v] );					  
+						$.each( this.deps,function(i,v){
+							//argvs.push( Nex.Loader.exports[v] );	
+							argvs.push( self.getExports( v ) );					  
 						} );
 						argvs.push( window[opt.exportsName] );
-						fn.apply(self,argvs);	
+						var r = fn.apply(this,argvs);	
+						if( r !== undef ) {
+							window[opt.exportsName] = r;	
+						}
 						//如果模块存在 执行回调 并且回调里面的exports保持到当前模块中
-						if( this.moduleName ) {//&& !( this.moduleName in Nex.Loader.exports ) 
-							Nex.Loader.exports[ this.moduleName ] = $.isPlainObject( window[opt.exportsName] ) && $.isEmptyObject( window[opt.exportsName] ) ? undef : window[opt.exportsName];	//window[opt.exportsName];	
+						var ep = $.isPlainObject( window[opt.exportsName] ) && $.isEmptyObject( window[opt.exportsName] ) ? undef : window[opt.exportsName];
+						if( this.moduleName && ep ) {
+							Nex.Loader.exports[ this.moduleName ] = ep;
+						}
+						
+						if( this._module && ep ) {
+							var mextra = this._module.split(/\s+/);
+							$.each( mextra,function(i,v){
+								Nex.Loader.exports[ v ] = ep;	
+								Nex.Loader._loadCache[ v ] = true;	
+							} );
 						}
 						//清空exports
 						self.resetExports();
 					}
 				};
 				Nex.array_insert( 0,[ window[opt.exportsName+'CallBack'] ],self.__loaderCallBack,1 );
+			} else {
+				window[opt.exportsName+'CallBack'] = {};	
 			}
-		
+			
 			if( opt._list.length ) {
 				$.each( list,function(i,d){
-					opt._loadCache[d + ''] = null;
+					if( !(d in opt._loadCache) ) {
+						opt._loadCache[d + ''] = null;
+					}
 				} );
 				if( opt.loadOrder ) {
 					Nex.array_insert( 0,list,opt._list,1 );
@@ -969,6 +1356,7 @@
 				}
 			} else {
 				opt.items = list;
+
 				self.startLoad();
 			}
 			return self;	
@@ -993,7 +1381,7 @@
 			return deps;
 		},
 		/*
-		*加载脚本
+		*加载模块
 		*@param {Array} 需要加载的依赖 {String} 直接获取已经加载的模块 {func} 定义一个模块
 		*@param {func} 依赖加载完回调
 		*@param {func} 依赖加载失败回调
@@ -1005,24 +1393,72 @@
 			if( !arguments.length ) {
 				return self;	
 			}	
-			if( $.isArray( deps ) && deps.length ) {
-				this.load.apply( this,arguments );	
+			if( $.isArray( deps ) ) {
+				if( deps.length ) {
+					this.load.apply( this,arguments );	
+					window[opt.exportsName+'CallBack'] = {};
+				} else {
+					if( $.isFunction( callback ) ) {
+						self.require( callback );	
+					}	
+				}
 			} else if( $.type( deps ) === 'string' ) {
 				if( $.isFunction( callback ) ) {
 					return self.require( [ deps ],callback,errback );
 				}
+				self.fireEvent('onRequireModule',[ deps,Nex.Loader.exports,opt ]);
 				return Nex.Loader.exports[ deps ];	
 			} else if( $.isFunction( deps ) ) {
 				var _deps = self.getInlineDeps( deps );
 				if( _deps.length ) {
-					return self.require( _deps,deps );	
+					self.require( _deps,deps );	
+				} else {
+					deps();	
 				}
-				var d = deps();
-				if( d !== undef ) {
-					self.exports( d );	
-				}	
+			}
+			return self;
+		},
+		/*
+		*定义一个模块
+		*@param {Array} deps 依赖模块
+		*@param {Function} callback 依赖加载后调用回调
+		*@param {Function} errback 依赖加载失败后调用回调 不建议用
+		*/
+		define : function(deps,callback,errback){
+			var self = this,
+				undef,
+				argvs = arguments,	
+				opt = this.configs;
+			if( !argvs.length ) {
+				return self;	
+			}	
+			if( argvs.length === 1 ) {
+				self.exports( argvs[0] );
+			} else if( $.isArray( deps ) /*&& deps.length*/ ) {
+				this.load.apply( this,arguments );	
+			} else if( $.type( deps ) === 'string' ) {
+				//定义模块
+				if( argvs.length>2 && $.isArray( callback ) ) {
+					var exports = argvs[1].concat([]),
+						currExports = argvs[0],
+						errBack = argvs[3],
+						fn = argvs[2];
+					self.load( exports,fn,undef,currExports );
+				} else if( callback!==undef ) {
+					Nex.Loader.setLoadCache(deps,callback);	
+				}
+			} else if( $.isFunction( deps ) ) {
+				var _deps = self.getInlineDeps( deps );
+				if( _deps.length ) {
+					self.require( _deps,deps );	
+				} else {
+					var d = deps();
+					if( d !== undef ) {
+						self.exports( d );	
+					}	
+				}
 			} else {
-				self.exports( d );		
+				self.exports( deps );		
 			}
 			return self;
 		},
@@ -1040,9 +1476,6 @@
 			return null;
 		},
 		include : function(){
-			return this.require.apply( this,arguments );
-		},
-		define : function(){
 			return this.require.apply( this,arguments );
 		},
 		//主要是针对IE 导出模块
@@ -1137,4 +1570,6 @@
 			return this.always.apply(this,arguments);	
 		}
 	});
+	//创建Loader
+	Nex.getLoader();
 })(jQuery);

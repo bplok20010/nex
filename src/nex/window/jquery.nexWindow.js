@@ -1083,7 +1083,7 @@ email:zere.nobo@gmail.com or QQ邮箱
 			var container = opt.views['container'];
 			container.hide();
 			if( opt.autoShow ) {
-				self._show();	
+				self.openWindow();	
 			}
 			//self.fireEvent('onCreate',[ opt ]);
 			

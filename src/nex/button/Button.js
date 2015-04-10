@@ -8,9 +8,10 @@ qq : 505931977
 
 ;(function($){
 	"use strict";
-	var button = Nex.extend('button','html');
-	$.nexButton = $.extButton = button;
-	
+	var button = Nex.define('Nex.button.Button','Nex.Html',{
+		alias : 'Nex.Button'
+	}).setXType('button');
+	//$.nexButton = $.extButton = button;
 	button.extend({
 		version : '1.0',
 		_Tpl : {				
@@ -35,8 +36,6 @@ qq : 505931977
 			autoScroll : false,
 			autoScrollCls : '',
 			autoFocus : false,
-			type : 'button',// type button file
-			name : '',//file时使用
 			splitBtn : false,
 			toggleBtn : false,
 			pressed : false,
@@ -61,8 +60,8 @@ qq : 505931977
 			iconCls : '',
 			arrowAlign : 'right',//按钮 箭头位置 right bottom
 			showArrow : false,//默认不显示 如果items 有值会自动显示
-			arrow : '',
-			arrowCls : '',
+			arrow : '',//图标地址
+			arrowCls : '',//arrow 样式 
 			disabled : false,
 			callBack : $.noop,
 			toggleHandler : $.noop,
@@ -167,7 +166,6 @@ qq : 505931977
 		_sysEvents : function(){
 			var self = this;
 			var opt = self.configs;
-			self.bind("onCreate.file",self._setFile,self);
 			self.bind("onCreate.over",self._setFocus,self);
 			self.bind("onCreate.over",self.toggleBtnCls,self);
 			self.bind("onCreate.over",self._onCreate,self);
@@ -181,38 +179,18 @@ qq : 505931977
 			self.bind("onClick.click",self._click,self);
 			self.bind("onKeyDown.click",self._click2,self);
 			self.bind("onClick.menu",self._showMenu,self);
-			self.bind("onSplitBtnClick.menu",self._showSplitMenu,self);
 			return self;
 		},
 		createButton : function(){
 			var self = this;
 			var opt = self.configs;
 			
-			var method = opt.type+'Create';
-			var bindEvent = opt.type+'BindEvent';
+			self.setInnerButton();
+			self.bindButtonEvent();
 			
-			var tpl = '';
-			
-			if( method in self ) {
-				var r = self[method].call(self);
-				if( r === false ) return false;
-			
-				if( bindEvent in self ) {
-					self[bindEvent].call(self);
-				} else {
-					self.commonEvent();
-				}
-			} else {
-				self.commonCreaet();
-				if( bindEvent in self ) {
-					self[bindEvent].call(self);
-				} else {
-					self.commonEvent();
-				}
-			}
 			return true;
 		},
-		commonCreaet : function(){
+		setInnerButton : function(){
 			var self = this,
 				opt = self.configs,
 				vbody = self.getBody();
@@ -249,7 +227,7 @@ qq : 505931977
 			
 			self.fireEvent('onButtonInnerCreate',[btnInner]);
 		},
-		commonEvent : function(){
+		bindButtonEvent : function(){
 			var self = this;
 			var opt = self.C();
 			var container = self.getContainer();
@@ -380,42 +358,6 @@ qq : 505931977
 				btn.removeClass( opt.pressedCls );	
 			}
 		},
-		getFileName : function(){
-			var self = this;
-			var opt = self.C();	
-			return $('#'+opt.id+'-btn-file').val();
-		},
-		_setFile : function(){
-			var self = this;
-			var opt = self.C();	
-			if( opt.type.toLowerCase() != 'file' ) return;
-			var btn = opt.views['button'];//self.getDom();
-			var name = opt.name == '' ? opt.id+'_file' : opt.name;
-			$('#'+opt.id+'-btn-file').remove();
-			var file = $('<input id="'+opt.id+'-btn-file" hideFocus=true class="nex-btn-file-input" type="file" size="1" name="'+name+'" />');
-			var wrap = btn.find('>span.nex-btn-wraper');
-			
-			var isIE67 = function(){
-				if(navigator.userAgent.indexOf("MSIE 6.0")>0) 
-				{ 
-					return true;
-				} 
-				else if(navigator.userAgent.indexOf("MSIE 7.0")>0)  
-				{ 
-					return true;
-				} 
-				return false;
-			}
-			if( isIE67() ) {
-				wrap.height( wrap._height() );
-			}
-			
-			wrap.append( file );
-			file.height( wrap._outerHeight() );
-			file.bind( 'change',function(e){
-				self.fireEvent('onFileChange',[ this,$(this).val(),e ]);	
-			} );
-		},
 		_showMenu : function(btn,e){
 			var self = this;
 			var opt = self.configs;
@@ -524,6 +466,9 @@ qq : 505931977
 			if( opt.overCls ) {
 				btn.removeClass( opt.overCls );	
 			}
+			if( opt.plain ) {
+				self._unsetFoucsCls();	
+			}	
 		},
 		toggleBtnCls : function(){
 			var self = this,
@@ -548,12 +493,12 @@ qq : 505931977
 				return;	
 			}
 			
-			opt.callBack.call(self,btn,e);
+			opt.callBack.call(opt.context || self,btn,e);
 			
 			if( opt.toggleBtn ) {
 				opt.pressed = !opt.pressed;
 				self.toggleBtnCls();
-				opt.toggleHandler.call(self,opt.pressed,opt);	
+				opt.toggleHandler.call(opt.context || self,opt.pressed,opt);	
 			}
 		},
 		_click2 : function(btn,e){

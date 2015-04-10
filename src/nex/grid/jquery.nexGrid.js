@@ -5617,6 +5617,7 @@ field['callBack'].call(self,t,rowId,field,rowData);
 				var rdata = opt.url.call(self,opt.queryParams,success,error);
 				if( rdata !== undef ) {
 					success( rdata );	
+					complete();
 				}
 				
 			} else {

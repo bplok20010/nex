@@ -34,7 +34,9 @@
         <script type="text/javascript">
 			var html1,html2,html3;
 			$(function(){
-				var BHtml = Nex.extend( 'BHtml','html' ).setOptions(function(opt){
+				var BHtml = Nex.extend( 'BHtml','html',{
+						alias : 'TT.BHtml'
+					} ).setOptions(function(opt){
 					return {
 						test:78,
 						cls : opt.cls + ' abc1'

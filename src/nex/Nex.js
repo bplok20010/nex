@@ -491,6 +491,7 @@ var Nex = Nex || (function(win,$){
 					opt.self = self;
 		
 					self._eventLocks = {};
+					self._executeEventMaps = {};
 		
 					opt.id = opt.id || self.getId();
 					

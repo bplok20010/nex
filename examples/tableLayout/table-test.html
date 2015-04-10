@@ -29,6 +29,39 @@
 		</div>
 		<svg width="200px" height="200px">
             <circle cx="100" cy="100" r="100" fill="#ff0000"></circle>
+            <path d = "M 200 50 L 300 150 L 200 150 L 200 50" stroke = "black" stroke-width = "3" fill = "none"/>
         </svg>
+        <svg version="1.1" width="500" height="200"  xmlns="http://www.w3.org/2000/svg" >  
+   <defs>  
+      <linearGradient id="Gradient_Linear" x1="0%" y1="0%" x2="100%" y2="0%">  
+         <stop offset="0%" style="stop-color:rgb(255,255,0);stop-opacity:1"/>  
+         <stop offset="100%" style="stop-color:rgb(255,0,0);stop-opacity:1"/>  
+      </linearGradient>  
+   </defs>  
+   <rect id="rect1" onclick="showBTT()" x="12" y="12" width="100" height="80"  
+   style="fill:url(#Gradient_Linear)">  
+      <animate id="a1" attributeName="width"  
+      begin="click" to="300" dur="5s" fill="freeze"/>  
+      <animate attributeName="width" to="100" begin="a1.end" dur="5s" fill="freeze"/>  
+      <set attributeName="fill"  to="yellow" begin="a1.begin + 3s" dur="4s"/>  
+   </rect>  
+   <g id="g1" transform="translate(25,120)" fill="red" font-size="25">  
+      <text>IBM</text>  
+   </g>  
+   <script language="JavaScript">  
+      <![CDATA[  
+         function showBTT() {  
+            var g1=document.getElementById("g1");  
+            var txts=g1.getElementsByTagName("text");  
+            for(var i=txts.length-1;i>=0;i--){  
+               g1.removeChild(txts.item(i));  
+            }  
+            var text = document.createElementNS("http://www.w3.org/2000/svg","text");  
+            text.appendChild(document.createTextNode("BTT"));  
+               g1.appendChild(text);  
+         }  
+      ]]>  
+   </script>  
+ </svg>
     </body>
 </html>

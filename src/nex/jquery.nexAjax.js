@@ -13,7 +13,6 @@ Nex.ajax
 				prefix : 'nexajax-',
 				autoDestroy : false,
 				ajax : null,
-				caller : null,//调用者
 				data : {},
 				_qdata : {},
 				events : {
@@ -44,6 +43,7 @@ Nex.ajax
 			opt._beforeSend = opt.beforeSend || null;
 			opt._error = opt.error || null;
 			opt._success = opt.success || null;
+			opt._abort = opt.abort || null;
 			opt._complete = opt.complete || null;
 			
 			if( $.isPlainObject(opt.data) ) {
@@ -52,6 +52,19 @@ Nex.ajax
 				opt.data = opt.data.length ? '&'+opt._qdata : opt._qdata;
 			}
 			
+			opt.abort = function(){
+				var argvs = [];
+				//var argvs = [].slice.apply(arguments);
+				for( var i=0;i<arguments.length;i++ ) {
+					argvs.push( arguments[i] );	
+				}
+				argvs.push( this );
+				var r = self.fireEvent('onAbort',argvs);	
+				if( r === false ) return r;	
+				if( $.isFunction( opt._abort ) ) {
+					return opt._abort.apply( self,argvs );
+				}
+			}
 			opt.success = function(){
 				var argvs = [];
 				//var argvs = [].slice.apply(arguments);
@@ -59,10 +72,14 @@ Nex.ajax
 					argvs.push( arguments[i] );	
 				}
 				argvs.push( this );
+				if( self._customAbort === true ) {
+					opt.abort.apply( this,argvs );
+					return;
+				}
 				var r = self.fireEvent('onSuccess',argvs);	
 				if( r === false ) return r;	
 				if( $.isFunction( opt._success ) ) {
-					return opt._success.apply( this,argvs );
+					return opt._success.apply( self,argvs );
 				}
 			}
 			opt.beforeSend = function(){
@@ -75,7 +92,7 @@ Nex.ajax
 				if( r === false ) return r;
 				var rf;
 				if( $.isFunction( opt._beforeSend ) ) {
-					rf = opt._beforeSend.apply( this,argvs );
+					rf = opt._beforeSend.apply( self,argvs );
 				}
 				if( rf === false ) return false;
 				self.fireEvent('onAjaxStart',argvs);	
@@ -86,10 +103,14 @@ Nex.ajax
 					argvs.push( arguments[i] );	
 				}
 				argvs.push( this );
+				if( self._customAbort === true ) {
+					opt.abort.apply( this,argvs );
+					return;
+				}
 				var r = self.fireEvent('onError',argvs);	
 				if( r === false ) return r;
 				if( $.isFunction( opt._error ) ) {
-					return opt._error.apply( this,argvs );
+					return opt._error.apply( self,argvs );
 				}
 			}
 			opt.complete = function(){
@@ -102,7 +123,7 @@ Nex.ajax
 				var r = self.fireEvent('onComplete',argvs);	
 				if( r === false ) return r;	
 				if( $.isFunction( opt._complete ) ) {
-					return opt._complete.apply( this,argvs );
+					return opt._complete.apply( self,argvs );
 				}
 			}
 			
@@ -110,38 +131,47 @@ Nex.ajax
 			//检测url是否是用户自定义函数
 			if( $.isFunction( opt.url ) ) {
 				opt.ajax = $.Deferred ? $.Deferred() : opt.url;	
-				var success = function(data,smsg){
-					smsg = self._undef( smsg,'success' );
-					self.fireEvent( 'onSuccess',[ data,smsg ] );
-					self.fireEvent('onComplete',[ data,'complete' ] );
+				var success = function(data){
+					if( $.isFunction( opt.dataFilter ) ) {
+						data = opt.dataFilter.call( self,data,opt.dataType || 'json' );	
+					}
+					opt.success.apply( self,[ data ] );
+					opt.complete.call( self,self,self._customAbort === true?'abort':'success' );
 					if( $.Deferred ) {
-						opt.ajax.resolve([ data,smsg ]);	
+						opt.ajax.resolve([ data ]);	
 					}
 				}; 
-				var error = function( data,smsg ){
-					smsg = self._undef( smsg,'error' );
-					self.fireEvent( 'onError'  ,[ data,smsg ] );	
-					self.fireEvent('onComplete',[ data,'complete' ] );
+				var error = function( data ){
+					var argvs = [];
+					for( var i=0;i<arguments.length;i++ ) {
+						argvs.push( arguments[i] );	
+					}
+					opt.error.apply( self,[ data ] );
+					opt.complete.call( self,self,self._customAbort === true?'abort':'error' );
 					if( $.Deferred ) {
-						opt.ajax.reject([ data,smsg ]);
+						opt.ajax.reject([ data ]);
 					}
 				};
-				var rf = opt.beforeSend.call( self );
+				var rf = opt.beforeSend.call( self,opt );
 				if( rf !== false ) {
 					setTimeout( function(){
 						var undef,d = opt.url.apply( self,[opt.data,success,error,opt] );	 
 						if( d !== undef ) {
 							if( d===false ) {
-								error(null,'error');	
+								error(null);	
 							} else {
-								success(d,'success');		
+								success(d);		
 							}
-							//self.fireEvent('onComplete',[ d,'complete' ] );	
 						}
 					},0 );
 				}
 			} else {
-				opt.ajax = $.ajax( opt );	
+				var rf = opt.beforeSend.call( self,opt );
+				opt.beforeSend = null;
+				delete opt.beforeSend; 
+				if( rf !== false ) {
+					opt.ajax = $.ajax( opt );	
+				}
 			}
 			
 			self.fireEvent('onCreate',[ opt.ajax,opt ]);	
@@ -152,12 +182,26 @@ Nex.ajax
 		getDeferred : function(){
 			return this.getAjax();	
 		},
+		//设置是否用户自己调用abort来取消请求
+		_customAbort : false,
+		//如果传递了参数则说明是绑定取消事件
 		abort : function(){
 			var self = this;
-			var ajax = self.getAjax();
-			if( ajax && ajax.abort ) {
-				ajax.abort();	
+			var argvs = arguments;
+			if( argvs.length ) {
+				for( var i=0,len = argvs.length;i<len;i++ ) {
+					if( $.isFunction( argvs[i] ) ) {
+						this.bind('onAbort.deferred',argvs[i]/*,this*/);
+					}		
+				}
+			} else {
+				var ajax = self.getAjax();
+				if( ajax && ajax.abort ) {
+					self._customAbort = true;
+					ajax.abort();	
+				}
 			}
+			return self;
 		},
 		_sysEvents : function(){
 			var self = this;
@@ -166,14 +210,15 @@ Nex.ajax
 			return self;
 		},
 		_removeAjax : function(){
-			this.C('autoDestroy',true);
+			this.configs.autoDestroy = true;
+			this.configs.context = null;
 			this.removeCmp(true);	
 		},
 		done : function(func){
 			var argvs = arguments;
 			for( var i=0,len = argvs.length;i<len;i++ ) {
 				if( $.isFunction( argvs[i] ) ) {
-					this.bind('onSuccess.deferred',argvs[i]);
+					this.bind('onSuccess.deferred',argvs[i]/*,this*/);
 				}		
 			}
 			return this;	
@@ -186,7 +231,7 @@ Nex.ajax
 			var argvs = arguments;
 			for( var i=0,len = argvs.length;i<len;i++ ) {
 				if( $.isFunction( argvs[i] ) ) {
-					this.bind('onError.deferred',argvs[i]);
+					this.bind('onError.deferred',argvs[i]/*,this*/);
 				}		
 			}
 			return this;	
@@ -197,10 +242,10 @@ Nex.ajax
 		},
 		then : function(s,f,p){	
 			if( $.isFunction( s ) ) {
-				this.bind('onSuccess.deferred',argvs[i]);
+				this.bind('onSuccess.deferred',s/*,this*/);
 			}	
-			if( $.isFunction( argvs[i] ) ) {
-				this.bind('onError.deferred',f);
+			if( $.isFunction( f ) ) {
+				this.bind('onError.deferred',f/*,this*/);
 			}		
 			return this;	
 		},
@@ -208,7 +253,7 @@ Nex.ajax
 			var argvs = arguments;
 			for( var i=0,len = argvs.length;i<len;i++ ) {
 				if( $.isFunction( argvs[i] ) ) {
-					this.bind('onComplete.deferred',argvs[i]);
+					this.bind('onComplete.deferred',argvs[i]/*,this*/);
 				}		
 			}
 			return this;
